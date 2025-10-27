@@ -14,11 +14,21 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
       ripgrep \
       fd-find \
       fzf \
-      lazygit \
-      nodejs \
-      npm \
       python3 \
       python3-pip
+
+    # Install Node.js (via NodeSource)
+    echo "Installing Node.js..."
+    curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+    sudo apt install -y nodejs
+
+    # Install lazygit
+    echo "Installing lazygit..."
+    LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+    curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
+    tar xf lazygit.tar.gz lazygit
+    sudo install lazygit /usr/local/bin
+    rm lazygit lazygit.tar.gz
 
     # Install newer Neovim (distro version is usually too old)
     echo "Installing Neovim..."
@@ -38,12 +48,19 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
       ripgrep \
       fd-find \
       fzf \
-      lazygit \
-      neovim \
-      nodejs \
-      npm \
       python3 \
       python3-pip
+
+    # Install Node.js
+    echo "Installing Node.js..."
+    curl -fsSL https://rpm.nodesource.com/setup_lts.x | sudo bash -
+    sudo dnf install -y nodejs
+
+    # Install lazygit
+    echo "Installing lazygit..."
+    sudo dnf copr enable atim/lazygit -y
+    sudo dnf install -y lazygit
+
     echo "✓ Dependencies installed!"
   fi
 
@@ -73,5 +90,6 @@ nvim --version | head -n 1
 nvim --version | grep -i luajit && echo "✓ LuaJIT support detected" || echo "⚠ Warning: LuaJIT not detected"
 node --version 2>/dev/null && echo "✓ Node.js installed" || echo "⚠ Node.js not found"
 python3 --version && echo "✓ Python installed" || echo "⚠ Python not found"
+lazygit --version 2>/dev/null && echo "✓ lazygit installed" || echo "⚠ lazygit not found"
 echo ""
 echo "Run ./install.sh to set up your config!"
