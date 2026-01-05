@@ -1,8 +1,5 @@
 return {
   {
-    "gbprod/cutlass.nvim",
-  },
-  {
     "akinsho/toggleterm.nvim",
     version = "*",
     keys = {
