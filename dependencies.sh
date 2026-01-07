@@ -38,7 +38,26 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
 
     echo "✓ Dependencies installed!"
 
-  # RHEL/Fedora
+  # Arch / Arch-based distributions (Manjaro, EndeavourOS, etc.)
+  elif command -v pacman &>/dev/null; then
+    sudo pacman -Syu --noconfirm
+    sudo pacman -S --noconfirm \
+      git \
+      curl \
+      base-devel \
+      ripgrep \
+      fzf \
+      fd \
+      python \
+      python-pip \
+      neovim \
+      nodejs \
+      npm \
+      lazygit
+
+    echo "✓ Dependencies installed!"
+
+  # RHEL/Fedora-based distributions
   elif command -v dnf &>/dev/null; then
     sudo dnf install -y \
       git \
@@ -93,3 +112,4 @@ python3 --version && echo "✓ Python installed" || echo "⚠ Python not found"
 lazygit --version 2>/dev/null && echo "✓ lazygit installed" || echo "⚠ lazygit not found"
 echo ""
 echo "Run ./install.sh to set up your config!"
+
