@@ -39,6 +39,23 @@ return {
         mode = "n",
       },
       {
+        "<leader>af",
+        function()
+          local file = vim.fn.expand("%:p:h")
+          require("toggleterm.terminal").Terminal
+            :new({
+              cmd = "claude",
+              dir = file,
+              direction = "float",
+              close_on_exit = false,
+              id = 68,
+            })
+            :toggle()
+        end,
+        desc = "Open Claude Fine at current directory",
+        mode = "n",
+      },
+      {
         "<leader>rd",
         function()
           require("toggleterm.terminal").Terminal
@@ -72,7 +89,6 @@ return {
         desc = "Toggle terminal",
         mode = "n",
       },
-      -- Add keybindings for numbered terminals
       {
         "<leader>t1",
         "<cmd>1ToggleTerm<cr>",
