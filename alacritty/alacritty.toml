@@ -1,0 +1,68 @@
+# ─────────────────────────────────────────────────────────────────────────
+#  OLED theme - Pure black background with vibrant colors
+#  vers. 2.0.0
+# ─────────────────────────────────────────────────────────────────────────
+
+# ── Window Settings ──────────────────────────────────────────────────────
+[window]
+opacity = 0.95
+
+# ── Cursor & Selection Colours ───────────────────────────────────────────
+[colors.cursor]
+cursor = "#00d9ff"
+text   = "#000000"
+
+[colors.selection]
+text       = "#ffffff"
+background = "#1a1a1a"
+
+# ── Primary Colours ───────────────────────────────────────────────────────
+[colors.primary]
+background = "#000000"
+foreground = "#ffffff"
+
+# ── Normal Palette (ANSI) ────────────────────────────────────────────────
+[colors.normal]
+black   = "#000000"
+red     = "#ff5555"
+green   = "#50fa7b"
+yellow  = "#f1fa8c"
+blue    = "#66d9ef"
+magenta = "#ff79c6"
+cyan    = "#8be9fd"
+white   = "#f8f8f2"
+
+# ── Bright Palette (ANSI) ────────────────────────────────────────────────
+[colors.bright]
+black   = "#555555"
+red     = "#ff6e6e"
+green   = "#69ff94"
+yellow  = "#ffffa5"
+blue    = "#7fecff"
+magenta = "#ff92df"
+cyan    = "#a4ffff"
+white   = "#ffffff"
+
+# ── Font Settings ────────────────────────────────────────────────────────
+[font]
+size = 14
+
+[font.normal]
+family = "Terminess Nerd Font Mono"
+style  = "Regular"
+
+[font.italic]
+family = "Terminess Nerd Font Mono"
+style  = "Regular"
+
+# ── Mouse & Environment ───────────────────────────────────────────────────
+[mouse]
+hide_when_typing = true
+
+[env]
+TERM = "xterm-256color"
+
+[[keyboard.bindings]]
+key = "Return"
+mods = "Shift"
+chars = "\u001b\r"
