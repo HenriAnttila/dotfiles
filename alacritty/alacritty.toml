@@ -1,51 +1,31 @@
-# ─────────────────────────────────────────────────────────────────────────
-#  OLED theme - Pure black background with vibrant colors
-#  vers. 2.0.0
-# ─────────────────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════
+#  Alacritty Configuration - Electric Nord Theme
+#  A vibrant Nordic aesthetic with electric blue accents
+# ═══════════════════════════════════════════════════════════════════════════
 
-# ── Window Settings ──────────────────────────────────────────────────────
+# ─── Window Settings ─────────────────────────────────────────────────────────
 [window]
-opacity = 0.95
+opacity = 0.92
+padding = { x = 14, y = 14 }
+decorations = "None"
+dynamic_padding = true
+title = "Alacritty"
+dynamic_title = true
 
-# ── Cursor & Selection Colours ───────────────────────────────────────────
-[colors.cursor]
-cursor = "#00d9ff"
-text   = "#000000"
+[window.dimensions]
+columns = 120
+lines = 36
 
-[colors.selection]
-text       = "#ffffff"
-background = "#1a1a1a"
 
-# ── Primary Colours ───────────────────────────────────────────────────────
-[colors.primary]
-background = "#000000"
-foreground = "#ffffff"
+# ─── Scrolling ───────────────────────────────────────────────────────────────
+[scrolling]
+history = 10000
+multiplier = 3
 
-# ── Normal Palette (ANSI) ────────────────────────────────────────────────
-[colors.normal]
-black   = "#000000"
-red     = "#ff5555"
-green   = "#50fa7b"
-yellow  = "#f1fa8c"
-blue    = "#66d9ef"
-magenta = "#ff79c6"
-cyan    = "#8be9fd"
-white   = "#f8f8f2"
 
-# ── Bright Palette (ANSI) ────────────────────────────────────────────────
-[colors.bright]
-black   = "#555555"
-red     = "#ff6e6e"
-green   = "#69ff94"
-yellow  = "#ffffa5"
-blue    = "#7fecff"
-magenta = "#ff92df"
-cyan    = "#a4ffff"
-white   = "#ffffff"
-
-# ── Font Settings ────────────────────────────────────────────────────────
+# ─── Font Settings ───────────────────────────────────────────────────────────
 [font]
-size = 14
+size = 18
 
 [font.normal]
 family = "Terminess Nerd Font Mono"
@@ -53,20 +33,155 @@ style = "Regular"
 
 [font.bold]
 family = "Terminess Nerd Font Mono"
-style = "Regular"
+style = "Bold"
 
 [font.italic]
 family = "Terminess Nerd Font Mono"
-style = "Regular"
+style = "Italic"
 
-# ── Mouse & Environment ───────────────────────────────────────────────────
+[font.bold_italic]
+family = "Terminess Nerd Font Mono"
+style = "Bold Italic"
+
+[font.offset]
+x = 0
+y = 1
+
+
+# ─── Electric Nord Colors ───────────────────────────────────────────────────
+[colors.primary]
+background = "#2E3440"
+foreground = "#ECEFF4"
+dim_foreground = "#4C566A"
+bright_foreground = "#ECEFF4"
+
+[colors.cursor]
+text = "#2E3440"
+cursor = "#00D4FF"
+
+[colors.vi_mode_cursor]
+text = "#2E3440"
+cursor = "#5EEAD4"
+
+[colors.search.matches]
+foreground = "#2E3440"
+background = "#88C0FC"
+
+[colors.search.focused_match]
+foreground = "#2E3440"
+background = "#00D4FF"
+
+[colors.footer_bar]
+foreground = "#2E3440"
+background = "#D8DEE9"
+
+[colors.hints.start]
+foreground = "#2E3440"
+background = "#FFE066"
+
+[colors.hints.end]
+foreground = "#2E3440"
+background = "#D8DEE9"
+
+[colors.selection]
+text = "#2E3440"
+background = "#00D4FF"
+
+# Normal colors - Electric Nord palette
+[colors.normal]
+black = "#3B4252"
+red = "#FF6B8A"
+green = "#95E6A0"
+yellow = "#FFE066"
+blue = "#00D4FF"
+magenta = "#C792EA"
+cyan = "#5EEAD4"
+white = "#E5E9F0"
+
+# Bright colors - Vibrant accents
+[colors.bright]
+black = "#4C566A"
+red = "#FF8FA3"
+green = "#A8F0B0"
+yellow = "#FFE88A"
+blue = "#00E5FF"
+magenta = "#D4A6F5"
+cyan = "#7FFFED"
+white = "#ECEFF4"
+
+# Dim colors - Muted variants
+[colors.dim]
+black = "#2E3440"
+red = "#BF616A"
+green = "#8FBCBB"
+yellow = "#EBCB8B"
+blue = "#81A1C1"
+magenta = "#B48EAD"
+cyan = "#88C0D0"
+white = "#D8DEE9"
+
+# Indexed colors (for special highlights)
+[[colors.indexed_colors]]
+index = 16
+color = "#FFAB70"
+
+[[colors.indexed_colors]]
+index = 17
+color = "#00D4FF"
+
+
+# ─── Cursor ──────────────────────────────────────────────────────────────────
+[cursor]
+blink_interval = 500
+unfocused_hollow = true
+
+[cursor.style]
+shape = "Block"
+blinking = "On"
+
+
+# ─── Selection ───────────────────────────────────────────────────────────────
+[selection]
+save_to_clipboard = true
+
+
+# ─── Mouse ───────────────────────────────────────────────────────────────────
 [mouse]
 hide_when_typing = true
 
+
+# ─── Environment ─────────────────────────────────────────────────────────────
 [env]
 TERM = "xterm-256color"
 
+
+# ─── Keyboard Bindings ───────────────────────────────────────────────────────
 [[keyboard.bindings]]
 key = "Return"
 mods = "Shift"
 chars = "\u001b\r"
+
+[[keyboard.bindings]]
+key = "V"
+mods = "Control|Shift"
+action = "Paste"
+
+[[keyboard.bindings]]
+key = "C"
+mods = "Control|Shift"
+action = "Copy"
+
+[[keyboard.bindings]]
+key = "Plus"
+mods = "Control"
+action = "IncreaseFontSize"
+
+[[keyboard.bindings]]
+key = "Minus"
+mods = "Control"
+action = "DecreaseFontSize"
+
+[[keyboard.bindings]]
+key = "Key0"
+mods = "Control"
+action = "ResetFontSize"
