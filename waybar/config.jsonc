@@ -8,11 +8,17 @@
   "margin-right": 12,
   "modules-left": [
     "custom/reboot",
-    "custom/power"
+    "custom/power",
+    "hyprland/workspaces"
   ],
   "modules-center": [
     "hyprland/window"
   ],
+  "hyprland/window": {
+    "format": "{title}",
+    "max-length": 40,
+    "separate-outputs": true
+  },
   "modules-right": [
     "network",
     "bluetooth",
@@ -22,6 +28,9 @@
     "cpu",
     "clock"
   ],
+  "hyprland/workspaces": {
+    "format": "{id}"
+  },
   "custom/lock": {
     "format": "<span color='#00FFFF'> 󰌾 </span>",
     "on-click": "hyprlock",

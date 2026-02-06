@@ -41,13 +41,20 @@
 
 /* ─── Module Containers ───────────────────────────────────────────────────── */
 #workspaces,
-#window,
 #tray {
     background-color: alpha(@polar0, 0.92);
     padding: 4px 10px;
     margin-top: 6px;
     margin-left: 6px;
     margin-right: 6px;
+    border-radius: 14px;
+    border: 1px solid alpha(@electric1, 0.3);
+}
+
+#window {
+    background-color: alpha(@polar0, 0.92);
+    padding: 4px 10px;
+    margin-top: 6px;
     border-radius: 14px;
     border: 1px solid alpha(@electric1, 0.3);
 }
@@ -116,28 +123,24 @@
 
 /* ─── Workspace Buttons ───────────────────────────────────────────────────── */
 #workspaces button {
+    all: unset;
     background: transparent;
-    border: none;
     color: @polar3;
     padding: 2px 10px;
     margin: 0 2px;
     font-weight: bold;
-    border-radius: 10px;
-    transition: all 0.2s ease;
 }
 
 #workspaces button:hover {
-    background-color: alpha(@electric1, 0.15);
-    color: @snow1;
+    background-color: alpha(@polar2, 0.95);
+    border-color: alpha(@electric1, 0.6);
+    border-radius: 10px;
 }
 
-#workspaces button.active {
-    background: linear-gradient(135deg, @electric1, @electric3);
-    color: @polar0;
-    padding: 2px 10px;
-    margin: 0 2px;
-    border-radius: 10px;
-    box-shadow: 0 0 8px alpha(@electric1, 0.4);
+#workspaces button.active,
+#workspaces button.active label {
+    background: transparent;
+    color: #00D4FF;
 }
 
 #workspaces button.urgent {
@@ -146,10 +149,9 @@
 }
 
 /* ─── Window Title ────────────────────────────────────────────────────────── */
-#window {
-    font-weight: 500;
-    font-style: italic;
-    color: @snow0;
+window#waybar.empty #window {
+    background: none;
+    border: none;
 }
 
 /* ─── Tray ────────────────────────────────────────────────────────────────── */
