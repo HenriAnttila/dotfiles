@@ -7,7 +7,7 @@ return {
           return LazyVim.pick(cmd, opts)()
         end,
         -- Your custom header
-        header = [[Allons-y!]],
+        header = [[Succisa virescit]],
         -- Optional buttons
         keys = {
           { icon = " ", key = "f", desc = "Find File", action = ":lua Snacks.dashboard.pick('files')" },
