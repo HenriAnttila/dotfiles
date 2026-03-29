@@ -1,5 +1,11 @@
+[mgr]
+border = "plain"
+
 [opener]
 edit = [
   { run = 'nvim --server "$NVIM" --remote-tab "$@"', block = true, for = "unix" },
   { run = 'nvim "$@"', block = true },                                             # fallback if not inside nvim
+]
+edit-tmux = [
+  { run = 'tmux new-window "nvim \"$@\""', for = "unix" },
 ]
