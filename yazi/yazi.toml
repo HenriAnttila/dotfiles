@@ -9,3 +9,6 @@ edit = [
 edit-tmux = [
   { run = 'tmux new-window "nvim \"$@\""', for = "unix" },
 ]
+terminal = [
+  { run = 'tmux new-window -c "$@"', for = "unix" },
+]

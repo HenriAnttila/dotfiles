@@ -1,4 +1,4 @@
-[[manager.prepend_keymap]]
+[[mgr.prepend_keymap]]
 on   = [ "g", "t" ]
-run  = "open --with edit-tmux"
-desc = "Open in new tmux window with nvim"
+run  = 'shell "tmux new-window -c $0" --confirm'
+desc = "Open in new tmux window"
