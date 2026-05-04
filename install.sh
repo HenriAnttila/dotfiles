@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Symlink Neovim config
+# Symlink configs
 ln -sf ~/dotfiles/nvim ~/.config/nvim
+ln -sf ~/dotfiles/yazi ~/.config/yazi
 
 # Add other symlinks as needed
 # ln -sf ~/dotfiles/bashrc ~/.bashrc

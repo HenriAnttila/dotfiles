@@ -1,0 +1,9 @@
+[[mgr.prepend_keymap]]
+on   = [ "g", "t" ]
+run  = 'shell "tmux new-window -c $0" --confirm'
+desc = "Open in new tmux window"
+
+[[mgr.prepend_keymap]]
+on   = [ "c", "j" ]
+run  = 'shell "sips -s format jpeg \"$0\" --out \"${0%.*}.jpg\" && rm \"$0\"" --confirm'
+desc = "Convert to JPEG"
