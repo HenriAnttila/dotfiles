@@ -4,3 +4,4 @@
 vim.opt.number = true
 vim.opt.relativenumber = true
 vim.o.linespace = 11
+vim.g.python3_host_prog = "/opt/anaconda3/bin/python"
