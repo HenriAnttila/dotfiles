@@ -5,16 +5,16 @@
 
 # ─── Window Settings ─────────────────────────────────────────────────────────
 [window]
-opacity = 0.92
-padding = { x = 14, y = 14 }
-decorations = "None"
+option_as_alt = "None"
+#opacity = 0.92
+#decorations = "None"
 dynamic_padding = true
 title = "Alacritty"
 dynamic_title = true
 
 [window.dimensions]
-columns = 120
-lines = 36
+columns = 80
+lines = 28
 
 
 # ─── Scrolling ───────────────────────────────────────────────────────────────
@@ -25,109 +25,68 @@ multiplier = 3
 
 # ─── Font Settings ───────────────────────────────────────────────────────────
 [font]
-size = 18
+size = 16
 
 [font.normal]
-family = "Terminess Nerd Font Mono"
+family = "JetBrainsMono Nerd Font Mono"
 style = "Regular"
 
 [font.bold]
-family = "Terminess Nerd Font Mono"
+family = "JetBrainsMono Nerd Font Mono"
 style = "Bold"
 
 [font.italic]
-family = "Terminess Nerd Font Mono"
+family = "JetBrainsMono Nerd Font Mono"
 style = "Italic"
 
 [font.bold_italic]
-family = "Terminess Nerd Font Mono"
+family = "JetBrainsMono Nerd Font Mono"
 style = "Bold Italic"
 
 [font.offset]
 x = 0
-y = 1
+y = 10
 
-
-# ─── Electric Nord Colors ───────────────────────────────────────────────────
+# ─── Flexoki Dark Colors ────────────────────────────────────────────────────
 [colors.primary]
-background = "#2E3440"
-foreground = "#ECEFF4"
-dim_foreground = "#4C566A"
-bright_foreground = "#ECEFF4"
+background = "0x100F0F"
+bright_foreground = "0xFFFCF0"
+dim_foreground = "0xFFFCF0"
+foreground = "0xFFFCF0"
 
 [colors.cursor]
-text = "#2E3440"
-cursor = "#00D4FF"
+cursor = "0xFFFCF0"
+text = "0xFFFCF0"
 
-[colors.vi_mode_cursor]
-text = "#2E3440"
-cursor = "#5EEAD4"
-
-[colors.search.matches]
-foreground = "#2E3440"
-background = "#88C0FC"
-
-[colors.search.focused_match]
-foreground = "#2E3440"
-background = "#00D4FF"
-
-[colors.footer_bar]
-foreground = "#2E3440"
-background = "#D8DEE9"
-
-[colors.hints.start]
-foreground = "#2E3440"
-background = "#FFE066"
-
-[colors.hints.end]
-foreground = "#2E3440"
-background = "#D8DEE9"
-
-[colors.selection]
-text = "#2E3440"
-background = "#00D4FF"
-
-# Normal colors - Electric Nord palette
 [colors.normal]
-black = "#3B4252"
-red = "#FF6B8A"
-green = "#95E6A0"
-yellow = "#FFE066"
-blue = "#00D4FF"
-magenta = "#C792EA"
-cyan = "#5EEAD4"
-white = "#E5E9F0"
+black = "0x100F0F"
+red = "0xAF3029"
+green = "0x66800B"
+yellow = "0xAD8301"
+blue = "0x205EA6"
+magenta = "0xA02F6F"
+cyan = "0x24837B"
+white = "0xFFFCF0"
 
-# Bright colors - Vibrant accents
 [colors.bright]
-black = "#4C566A"
-red = "#FF8FA3"
-green = "#A8F0B0"
-yellow = "#FFE88A"
-blue = "#00E5FF"
-magenta = "#D4A6F5"
-cyan = "#7FFFED"
-white = "#ECEFF4"
+black = "0x100F0F"
+red = "0xD14D41"
+green = "0x879A39"
+yellow = "0xD0A215"
+blue = "0x4385BE"
+magenta = "0xCE5D97"
+cyan = "0x3AA99F"
+white = "0xFFFCF0"
 
-# Dim colors - Muted variants
 [colors.dim]
-black = "#2E3440"
-red = "#BF616A"
-green = "#8FBCBB"
-yellow = "#EBCB8B"
-blue = "#81A1C1"
-magenta = "#B48EAD"
-cyan = "#88C0D0"
-white = "#D8DEE9"
-
-# Indexed colors (for special highlights)
-[[colors.indexed_colors]]
-index = 16
-color = "#FFAB70"
-
-[[colors.indexed_colors]]
-index = 17
-color = "#00D4FF"
+black = "0x100F0F"
+red = "0xAF3029"
+green = "0x66800B"
+yellow = "0xAD8301"
+blue = "0x205EA6"
+magenta = "0xA02F6F"
+cyan = "0x24837B"
+white = "0xFFFCF0"
 
 
 # ─── Cursor ──────────────────────────────────────────────────────────────────
