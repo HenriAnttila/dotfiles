@@ -6,8 +6,21 @@ local function applySnackStyling(color)
   vim.api.nvim_set_hl(0, "LineNr", { fg = color })
 end
 
+vim.api.nvim_create_autocmd("ColorScheme", {
+  pattern = "vesper",
+  callback = function()
+    applySnackStyling()
+  end,
+})
+
 -- Garbage themes will not be kept here :D
 return {
+  {
+    "kepano/flexoki-neovim",
+    name = "flexoki",
+    priority = 1010,
+    lazy = false,
+  },
   {
     "datsfilipe/vesper.nvim",
     priority = 1005,
@@ -23,6 +36,12 @@ return {
     lazy = false,
   },
   {
+    "ramojus/mellifluous.nvim",
+  },
+  {
+    "sam4llis/nvim-tundra",
+  },
+  {
     "kuri-sun/yoda.nvim",
   },
   {
@@ -34,6 +53,8 @@ return {
   },
   {
     "loctvl842/monokai-pro.nvim",
+    lazy = false,
+    priority = 1000,
   },
   {
     "valonmulolli/heap.nvim",
@@ -75,6 +96,12 @@ return {
   {
     "sainnhe/gruvbox-material",
     priority = 1002,
+    lazy = false,
+    config = function()
+      vim.g.gruvbox_material_foreground = "original"
+      vim.g.gruvbox_material_background = "hard"
+      vim.g.gruvbox_material_enable_bold = 1
+    end,
   },
   {
     "ribru17/bamboo.nvim",
@@ -82,11 +109,7 @@ return {
   },
   {
     "Mofiqul/vscode.nvim",
-    lazy = false,
     priority = 1000,
-    config = function()
-      vim.cmd.colorscheme("vscode")
-    end,
   },
   {
     "tiesen243/vercel.nvim",
@@ -95,5 +118,11 @@ return {
         theme = "dark",
       })
     end,
+  },
+  {
+    "LazyVim/LazyVim",
+    opts = {
+      colorscheme = "sainnhe/gruvbox-material",
+    },
   },
 }
