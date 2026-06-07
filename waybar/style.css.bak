@@ -1,0 +1,165 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Waybar Configuration - Electric Nord Theme
+   A vibrant Nordic aesthetic with electric blue accents
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Electric Nord Color Variables ───────────────────────────────────────── */
+@define-color polar0 #2E3440;
+@define-color polar1 #3B4252;
+@define-color polar2 #434C5E;
+@define-color polar3 #4C566A;
+
+@define-color snow0 #D8DEE9;
+@define-color snow1 #E5E9F0;
+@define-color snow2 #ECEFF4;
+
+@define-color electric1 #00D4FF;
+@define-color electric2 #00B4FF;
+@define-color electric3 #5EEAD4;
+@define-color frost #88C0FC;
+
+@define-color aurora_purple #C792EA;
+@define-color aurora_red #FF6B8A;
+@define-color aurora_orange #FFAB70;
+@define-color aurora_yellow #FFE066;
+@define-color aurora_green #95E6A0;
+
+/* ─── Global Settings ─────────────────────────────────────────────────────── */
+* {
+    font-family: "JetBrains Mono Nerd Font", "Font Awesome 6 Free", "Font Awesome 6 Free Solid";
+    font-weight: bold;
+    font-size: 16px;
+    color: @snow2;
+}
+
+/* ─── Transparent Waybar Background ───────────────────────────────────────── */
+#waybar {
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+/* ─── Module Containers ───────────────────────────────────────────────────── */
+#workspaces,
+#tray {
+    background-color: alpha(@polar0, 0.92);
+    padding: 4px 10px;
+    margin-top: 6px;
+    margin-left: 6px;
+    margin-right: 6px;
+    border-radius: 14px;
+    border: 1px solid alpha(@electric1, 0.3);
+}
+
+#window {
+    background-color: alpha(@polar0, 0.92);
+    padding: 4px 10px;
+    margin-top: 6px;
+    border-radius: 14px;
+    border: 1px solid alpha(@electric1, 0.3);
+}
+
+#clock,
+#custom-power {
+    background-color: alpha(@polar0, 0.92);
+    margin-top: 6px;
+    margin-right: 6px;
+    padding: 4px 10px;
+    border-radius: 0 14px 14px 0;
+    border: 1px solid alpha(@electric1, 0.3);
+    border-left: none;
+}
+
+#network,
+#custom-lock,
+#custom-reboot {
+    background-color: alpha(@polar0, 0.92);
+    margin-top: 6px;
+    margin-left: 6px;
+    padding: 4px 10px;
+    border-radius: 14px 0 0 14px;
+    border: 1px solid alpha(@electric1, 0.3);
+    border-right: none;
+}
+
+#bluetooth,
+#battery,
+#pulseaudio,
+#backlight,
+#custom-temperature,
+#memory,
+#cpu {
+    background-color: alpha(@polar0, 0.92);
+    margin-top: 6px;
+    padding: 4px 8px;
+    border: 1px solid alpha(@electric1, 0.3);
+    border-left: none;
+    border-right: none;
+}
+
+/* ─── Critical States ─────────────────────────────────────────────────────── */
+#custom-temperature.critical,
+#pulseaudio.muted {
+    color: @aurora_red;
+}
+
+/* ─── Hover Effects ───────────────────────────────────────────────────────── */
+#bluetooth:hover,
+#network:hover,
+#backlight:hover,
+#battery:hover,
+#pulseaudio:hover,
+#custom-temperature:hover,
+#memory:hover,
+#cpu:hover,
+#clock:hover,
+#custom-lock:hover,
+#custom-reboot:hover,
+#custom-power:hover,
+#window:hover {
+    background-color: alpha(@polar2, 0.95);
+    border-color: alpha(@electric1, 0.6);
+}
+
+/* ─── Workspace Buttons ───────────────────────────────────────────────────── */
+#workspaces button {
+    all: unset;
+    background: transparent;
+    color: @polar3;
+    padding: 2px 10px;
+    margin: 0 2px;
+    font-weight: bold;
+}
+
+#workspaces button:hover {
+    background-color: alpha(@polar2, 0.95);
+    border-color: alpha(@electric1, 0.6);
+    border-radius: 10px;
+}
+
+#workspaces button.active,
+#workspaces button.active label {
+    background: transparent;
+    color: #00D4FF;
+}
+
+#workspaces button.urgent {
+    background-color: @aurora_red;
+    color: @polar0;
+}
+
+/* ─── Window Title ────────────────────────────────────────────────────────── */
+window#waybar.empty #window {
+    background: none;
+    border: none;
+}
+
+/* ─── Tray ────────────────────────────────────────────────────────────────── */
+#tray > .passive {
+    -gtk-icon-effect: dim;
+}
+
+#tray > .needs-attention {
+    -gtk-icon-effect: highlight;
+    background-color: @aurora_red;
+}

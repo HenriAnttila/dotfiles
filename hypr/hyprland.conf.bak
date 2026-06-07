@@ -68,16 +68,10 @@ $snow1     = rgb(E5E9F0)
 $snow2     = rgb(ECEFF4)
 
 # ─── Electric Frost (Primary Accents) ───
-$electric1 = rgb(00FAFF)
+$electric1 = rgb(00D4FF)
 $electric2 = rgb(00B4FF)
-$electric3 = rgb(00FFE1)
+$electric3 = rgb(5EEAD4)
 $frost     = rgb(88C0FC)
-
-# ─── Evilware crimson (alert / secondary accent) ───
-$evil      = rgb(F10042)
-
-# ─── HUD glow (cyan bloom around windows) ───
-$hud_glow  = rgba(00FAFF55)
 
 # ─── Aurora (Secondary Accents) ───
 $aurora_teal   = rgb(8FBCBB)
@@ -95,7 +89,7 @@ general {
 
     border_size = 2
 
-    col.active_border = $electric1 $electric3 $electric2 45deg
+    col.active_border = $electric1 $electric3 45deg
     col.inactive_border = $polar2
 
     resize_on_border = true
@@ -104,22 +98,18 @@ general {
 }
 
 decoration {
-    rounding = 8
+    rounding = 14
     rounding_power = 2
 
     active_opacity = 1.0
-    inactive_opacity = 0.86
-    dim_inactive = true
-    dim_strength = 0.12
+    inactive_opacity = 0.90
 
-    # Cyan bloom on the focused window = HUD glow
     shadow {
         enabled = true
-        range = 16
-        render_power = 4
-        color = $hud_glow
-        color_inactive = rgba(00000033)
-        offset = 0 0
+        range = 25
+        render_power = 3
+        color = rgba(00000044)
+        offset = 0 4
     }
 
     blur {
@@ -141,11 +131,11 @@ animations {
     bezier = gentle, 0.5, 0, 0.5, 1
     bezier = electric, 0.16, 1, 0.3, 1
 
-    animation = windows, 1, 3.5, electric, popin 88%
-    animation = windowsOut, 1, 3.5, smoothOut, popin 88%
+    animation = windows, 1, 4, electric, slide
+    animation = windowsOut, 1, 4, smoothOut, slide
     animation = windowsMove, 1, 4, gentle
-    animation = border, 1, 8, default
-    animation = borderangle, 1, 100, default, loop
+    animation = border, 1, 10, default
+    animation = borderangle, 1, 200, default, loop
     animation = fade, 1, 4, smoothIn
     animation = fadeDim, 1, 4, smoothIn
     animation = workspaces, 1, 5, electric, slidevert
@@ -178,7 +168,7 @@ input {
     kb_layout = fi
     kb_variant =
     kb_model =
-    kb_options = ctrl:nocaps
+    kb_options =
     kb_rules =
 
     follow_mouse = 1
@@ -274,9 +264,6 @@ bind = $mainMod SHIFT, 0, movetoworkspace, 10
 bind = , Print, exec, grim ~/Pictures/screenshot-$(date +%Y%m%d-%H%M%S).png
 bind = SHIFT, Print, exec, grim -g "$(slurp)" ~/Pictures/screenshot-$(date +%Y%m%d-%H%M%S).png
 bind = CTRL, Print, exec, grim -g "$(slurp)" - | wl-copy
-
-# ─── Toggle bar (evilware full-bleed immersion) ───
-bind = $mainMod, B, exec, killall -SIGUSR1 waybar
 
 # ─── Scratchpad (like i3 stacking/tabbed replacement) ───
 bind = $mainMod, S, togglespecialworkspace, magic

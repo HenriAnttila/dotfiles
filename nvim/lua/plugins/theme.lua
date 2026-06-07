@@ -120,9 +120,15 @@ return {
     end,
   },
   {
+    -- base for the custom `evilware` colorscheme (colors/evilware.lua)
+    "folke/tokyonight.nvim",
+    lazy = false,
+    priority = 1010,
+  },
+  {
     "LazyVim/LazyVim",
     opts = {
-      colorscheme = "sainnhe/gruvbox-material",
+      colorscheme = "evilware",
     },
   },
 }

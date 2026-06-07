@@ -43,11 +43,39 @@ local function reset_bg()
   end
 end
 
+-- Make the background transparent on every theme change so the terminal
+-- (and its blur/wallpaper) shows through.
+local transparent_groups = {
+  "Normal",
+  "NormalNC",
+  "NormalFloat",
+  "FloatBorder",
+  "FloatTitle",
+  "SignColumn",
+  "MsgArea",
+  "TelescopeNormal",
+  "TelescopeBorder",
+  "NormalSB",
+  "WinBar",
+  "WinBarNC",
+}
+
+local function make_transparent()
+  for _, group in ipairs(transparent_groups) do
+    local ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = group })
+    if ok and next(hl) ~= nil then
+      hl.bg = nil
+      hl.ctermbg = nil
+      vim.api.nvim_set_hl(0, group, hl)
+    end
+  end
+end
+
 vim.api.nvim_create_autocmd({ "UIEnter", "ColorScheme" }, {
   callback = function()
-    local normal = vim.api.nvim_get_hl(0, { name = "Normal" })
-    if not normal.bg then return end
-    set_bg(normal.bg)
+    make_transparent()
+    -- Background is now transparent, so let the terminal's own bg show through.
+    reset_bg()
   end,
 })
 

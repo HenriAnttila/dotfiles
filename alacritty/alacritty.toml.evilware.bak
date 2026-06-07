@@ -5,7 +5,7 @@
 
 # ─── Window Settings ─────────────────────────────────────────────────────────
 [window]
-opacity = 0.88
+opacity = 0.92
 padding = { x = 14, y = 14 }
 decorations = "None"
 #dynamic_padding = true
@@ -25,110 +25,109 @@ multiplier = 3
 
 # ─── Font Settings ───────────────────────────────────────────────────────────
 [font]
-size = 16.5  # 16.5pt x 96/72 = 22px = native Terminess bitmap strike (crisp)
+size = 14
 
 [font.normal]
-family = "Terminess Nerd Font"
+family = "Lilex Nerd Font"
 style = "Regular"
 
 [font.bold]
-family = "Terminess Nerd Font"
+family = "Lilex Nerd Font"
 style = "Bold"
 
 [font.italic]
-family = "Terminess Nerd Font"
+family = "Lilex Nerd Font"
 style = "Italic"
 
 [font.bold_italic]
-family = "Terminess Nerd Font"
+family = "Lilex Nerd Font"
 style = "Bold Italic"
 
 [font.offset]
 x = 0
-y = 2
+y = 6
 
 
-# ─── EVILWARE Palette ────────────────────────────────────────────────────────
-#  True-black OLED bg, electric cyan fg, hot-crimson accent. eDEX-UI homage.
+# ─── Electric Nord Colors ───────────────────────────────────────────────────
 [colors.primary]
-background = "#000000"
-foreground = "#00FAFF"
-dim_foreground = "#0E5A5E"
-bright_foreground = "#00FFE1"
+background = "#2E3440"
+foreground = "#ECEFF4"
+dim_foreground = "#4C566A"
+bright_foreground = "#ECEFF4"
 
 [colors.cursor]
-text = "#000000"
-cursor = "#F10042"
+text = "#2E3440"
+cursor = "#00D4FF"
 
 [colors.vi_mode_cursor]
-text = "#000000"
-cursor = "#00FFE1"
+text = "#2E3440"
+cursor = "#5EEAD4"
 
 [colors.search.matches]
-foreground = "#000000"
-background = "#00FAFF"
+foreground = "#2E3440"
+background = "#88C0FC"
 
 [colors.search.focused_match]
-foreground = "#000000"
-background = "#F10042"
+foreground = "#2E3440"
+background = "#00D4FF"
 
 [colors.footer_bar]
-foreground = "#00FAFF"
-background = "#072025"
+foreground = "#2E3440"
+background = "#D8DEE9"
 
 [colors.hints.start]
-foreground = "#000000"
-background = "#F10042"
+foreground = "#2E3440"
+background = "#FFE066"
 
 [colors.hints.end]
-foreground = "#000000"
-background = "#00FAFF"
+foreground = "#2E3440"
+background = "#D8DEE9"
 
 [colors.selection]
-text = "#FFFFFF"
-background = "#072025"
+text = "#2E3440"
+background = "#00D4FF"
 
-# Normal colors - evilware two-tone (cyan + crimson)
+# Normal colors - Electric Nord palette
 [colors.normal]
-black = "#000000"
-red = "#F10042"
-green = "#00FAFF"
-yellow = "#F10042"
-blue = "#00FAFF"
-magenta = "#F10042"
-cyan = "#00FAFF"
-white = "#FF0059"
+black = "#3B4252"
+red = "#FF6B8A"
+green = "#95E6A0"
+yellow = "#FFE066"
+blue = "#00D4FF"
+magenta = "#C792EA"
+cyan = "#5EEAD4"
+white = "#E5E9F0"
 
-# Bright colors
+# Bright colors - Vibrant accents
 [colors.bright]
-black = "#1A1A1A"
-red = "#F10042"
-green = "#00FFE1"
-yellow = "#F10042"
-blue = "#00FFE1"
-magenta = "#F10042"
-cyan = "#00FFE1"
-white = "#FFFFFF"
+black = "#4C566A"
+red = "#FF8FA3"
+green = "#A8F0B0"
+yellow = "#FFE88A"
+blue = "#00E5FF"
+magenta = "#D4A6F5"
+cyan = "#7FFFED"
+white = "#ECEFF4"
 
-# Dim colors - muted variants
+# Dim colors - Muted variants
 [colors.dim]
-black = "#000000"
-red = "#8A0026"
-green = "#0E5A5E"
-yellow = "#8A0026"
-blue = "#0E5A5E"
-magenta = "#8A0026"
-cyan = "#0E5A5E"
-white = "#072025"
+black = "#2E3440"
+red = "#BF616A"
+green = "#8FBCBB"
+yellow = "#EBCB8B"
+blue = "#81A1C1"
+magenta = "#B48EAD"
+cyan = "#88C0D0"
+white = "#D8DEE9"
 
 # Indexed colors (for special highlights)
 [[colors.indexed_colors]]
 index = 16
-color = "#F10042"
+color = "#FFAB70"
 
 [[colors.indexed_colors]]
 index = 17
-color = "#00FAFF"
+color = "#00D4FF"
 
 
 # ─── Cursor ──────────────────────────────────────────────────────────────────
