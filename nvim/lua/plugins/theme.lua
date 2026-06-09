@@ -6,8 +6,9 @@ local function applySnackStyling(color)
   vim.api.nvim_set_hl(0, "LineNr", { fg = color })
 end
 
+-- Apply my indent-guide + LineNr colors on every colorscheme, not just vesper.
 vim.api.nvim_create_autocmd("ColorScheme", {
-  pattern = "vesper",
+  pattern = "*",
   callback = function()
     applySnackStyling()
   end,

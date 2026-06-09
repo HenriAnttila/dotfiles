@@ -1,0 +1,89 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  Ghostty Configuration — EVILWARE theme (ported from Alacritty)
+#  True-black OLED bg, electric cyan fg, hot-crimson accent. eDEX-UI homage.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ─── Window ──────────────────────────────────────────────────────────────────
+background-opacity = 1
+window-padding-x = 14
+window-padding-y = 14
+# Spread the leftover space (window height not evenly divisible by cell height)
+# across all edges instead of dumping it as a gap on the bottom/right.
+window-padding-balance = true
+window-decoration = true
+# dimensions in grid cells (columns x rows), mirrors alacritty [window.dimensions]
+window-width = 120
+window-height = 36
+# dynamic title is on by default in Ghostty (matches dynamic_title = true)
+
+# ─── Scrolling ───────────────────────────────────────────────────────────────
+# Alacritty history was 10000 lines; Ghostty's limit is in BYTES, not lines.
+# ~10 MB comfortably exceeds 10k lines of scrollback.
+scrollback-limit = 10000000
+mouse-scroll-multiplier = 3
+
+# ─── Font ────────────────────────────────────────────────────────────────────
+font-family = "Terminess Nerd Font"
+font-size = 16.5
+# Alacritty font.offset y = 2 (extra line spacing); closest Ghostty knob:
+adjust-cell-height = 5
+
+# ─── EVILWARE palette ────────────────────────────────────────────────────────
+background = 000000
+foreground = FFFFFF
+
+# cursor (alacritty [colors.cursor])
+cursor-color = F10042
+cursor-text = 000000
+
+# selection (alacritty [colors.selection])
+selection-foreground = FFFFFF
+selection-background = 072025
+
+# normal colors 0-7 (alacritty [colors.normal])
+palette = 0=#000000
+palette = 1=#F10042
+palette = 2=#00FAFF
+palette = 3=#F10042
+palette = 4=#00FAFF
+palette = 5=#F10042
+palette = 6=#00FAFF
+palette = 7=#FF0059
+# bright colors 8-15 (alacritty [colors.bright])
+palette = 8=#1A1A1A
+palette = 9=#F10042
+palette = 10=#00FFE1
+palette = 11=#F10042
+palette = 12=#00FFE1
+palette = 13=#F10042
+palette = 14=#00FFE1
+palette = 15=#FFFFFF
+# indexed highlights (alacritty [[colors.indexed_colors]])
+palette = 16=#F10042
+palette = 17=#00FAFF
+# Note: Ghostty has no direct equivalent for alacritty's dim_foreground,
+# bright_foreground, [colors.dim], vi_mode_cursor, search, hints, or footer_bar.
+
+# ─── Cursor ──────────────────────────────────────────────────────────────────
+cursor-style = block
+cursor-style-blink = true
+# (unfocused cursor renders hollow by default, matching unfocused_hollow = true)
+
+# ─── Selection / clipboard ───────────────────────────────────────────────────
+copy-on-select = clipboard
+
+# ─── Mouse ───────────────────────────────────────────────────────────────────
+mouse-hide-while-typing = true
+
+# ─── Environment ─────────────────────────────────────────────────────────────
+# Alacritty forced TERM=xterm-256color. Ghostty defaults to xterm-ghostty;
+# override to match (avoids "missing terminfo" on remote hosts).
+term = xterm-256color
+
+# ─── Keybindings (ported from alacritty [[keyboard.bindings]]) ────────────────
+keybind = shift+enter=text:\x1b\r
+keybind = ctrl+shift+v=paste_from_clipboard
+keybind = ctrl+shift+c=copy_to_clipboard
+keybind = ctrl+plus=increase_font_size:1
+keybind = ctrl+minus=decrease_font_size:1
+keybind = ctrl+zero=reset_font_size
