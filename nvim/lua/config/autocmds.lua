@@ -12,21 +12,6 @@ local function set_bg(color)
   local hex = string.format("#%06x", color)
   if vim.env.TMUX then
     io.write(string.format("\027Ptmux;\027\027]11;%s\007\027\\", hex))
-    -- Derive a muted fg from the bg so inactive dotbar text always has contrast
-    local r = math.floor(color / 65536)
-    local g = math.floor(color / 256) % 256
-    local b = color % 256
-    local lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
-    local fg
-    if lum > 0.5 then
-      fg = string.format("#%02x%02x%02x", math.max(0, r - 70), math.max(0, g - 70), math.max(0, b - 70))
-    else
-      fg = string.format("#%02x%02x%02x", math.min(255, r + 50), math.min(255, g + 50), math.min(255, b + 50))
-    end
-    vim.fn.jobstart({ "bash", "-c", string.format(
-      "tmux set -g @tmux-dotbar-bg '%s' && tmux set -g @tmux-dotbar-fg '%s' && ~/.tmux/plugins/tmux-dotbar/dotbar.tmux",
-      hex, fg
-    ) })
   else
     io.write(string.format("\027]11;%s\027\\", hex))
   end
@@ -35,9 +20,6 @@ end
 local function reset_bg()
   if vim.env.TMUX then
     io.write("\027Ptmux;\027\027]111;\007\027\\")
-    vim.fn.jobstart({ "bash", "-c",
-      "tmux set -g @tmux-dotbar-bg default && tmux set -g @tmux-dotbar-fg '#4C566A' && ~/.tmux/plugins/tmux-dotbar/dotbar.tmux",
-    })
   else
     io.write("\027]111\027\\")
   end

@@ -23,8 +23,8 @@ scrollback-limit = 10000000
 mouse-scroll-multiplier = 3
 
 # ─── Font ────────────────────────────────────────────────────────────────────
-font-family = "Terminess Nerd Font"
-font-size = 16.5
+font-family = "JetBrainsMono Nerd Font"
+font-size = 14
 # Alacritty font.offset y = 2 (extra line spacing); closest Ghostty knob:
 adjust-cell-height = 5
 
