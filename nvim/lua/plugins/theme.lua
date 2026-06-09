@@ -126,6 +126,11 @@ return {
     priority = 1010,
   },
   {
+    "sdhrt/codesandbox-theme.nvim",
+    priority = 1000,
+    lazy = false,
+  },
+  {
     "LazyVim/LazyVim",
     opts = {
       colorscheme = "evilware",
