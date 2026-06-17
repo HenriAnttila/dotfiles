@@ -14,6 +14,16 @@ vim.api.nvim_create_autocmd("ColorScheme", {
   end,
 })
 
+-- Remember whatever I switch to with `:colorscheme` and restore it next launch
+-- (the LazyVim `colorscheme` opt below reads this file on startup).
+local last_colorscheme = vim.fn.stdpath("data") .. "/last_colorscheme.txt"
+vim.api.nvim_create_autocmd("ColorScheme", {
+  pattern = "*",
+  callback = function(args)
+    pcall(vim.fn.writefile, { args.match }, last_colorscheme)
+  end,
+})
+
 -- Garbage themes will not be kept here :D
 return {
   {
@@ -134,7 +144,15 @@ return {
   {
     "LazyVim/LazyVim",
     opts = {
-      colorscheme = "evilware",
+      -- Restore the last `:colorscheme` I picked; fall back to evilware.
+      colorscheme = function()
+        local ok, lines = pcall(vim.fn.readfile, last_colorscheme)
+        local saved = ok and lines[1]
+        if saved and saved ~= "" and pcall(vim.cmd.colorscheme, saved) then
+          return
+        end
+        vim.cmd.colorscheme("evilware")
+      end,
     },
   },
 }
