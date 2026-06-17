@@ -18,9 +18,13 @@ ln -sf ~/dotfiles/lazygit.yml "$LAZYGIT_DIR/config.yml"
 mkdir -p ~/.tmux/scripts
 ln -sf ~/dotfiles/tmux/scripts/git-branch.sh ~/.tmux/scripts/git-branch.sh
 
-# tmux-window-name plugin needs libtmux. Homebrew's python is externally
-# managed (PEP 668), so install into the user site with --break-system-packages.
-python3 -m pip install --user --break-system-packages libtmux
+# tmux-window-name plugin needs libtmux. Its launcher checks bare `python`
+# (which may be anaconda/another interpreter), while the rename script uses
+# `python3` via env. Install into both so the check and the script both pass.
+# Homebrew's python is externally managed (PEP 668), hence --break-system-packages.
+python3 -m pip install --user --break-system-packages libtmux 2>/dev/null \
+  || python3 -m pip install --user libtmux
+command -v python >/dev/null && python -m pip install libtmux 2>/dev/null || true
 
 # Add other symlinks as needed
 # ln -sf ~/dotfiles/bashrc ~/.bashrc
