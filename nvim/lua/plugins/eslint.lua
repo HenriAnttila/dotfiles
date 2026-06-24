@@ -9,13 +9,11 @@ return {
   opts = {
     servers = {
       eslint = {
-        -- ESLint 9 defaults to flat config (eslint.config.js). Projects still
-        -- on legacy .eslintrc.* make the server throw:
-        --   -32603: ... Could not find config file
-        -- Force legacy config resolution so it picks up the .eslintrc.json.
-        settings = {
-          useFlatConfig = false,
-        },
+        -- Don't force a config mode. ESLint 9 defaults to flat config
+        -- (eslint.config.*); legacy projects with .eslintrc.* are still
+        -- auto-detected by the server. Hard-coding useFlatConfig = false broke
+        -- flat-config projects (server looked for a nonexistent .eslintrc and
+        -- threw -32603 "no eslint config").
         root_dir = function(bufnr, on_dir)
           local root = vim.fs.root(bufnr, {
             ".eslintrc",

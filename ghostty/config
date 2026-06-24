@@ -4,12 +4,34 @@
 # ═══════════════════════════════════════════════════════════════════════════
 
 # ─── Window ──────────────────────────────────────────────────────────────────
+# Start fullscreen, filling the entire screen edge-to-edge (content extends up
+# into the notch row). Hides the menu bar.
+fullscreen = non-native
+# `fullscreen` only sets the STARTUP state; the Cmd+Ctrl+F toggle obeys this key.
+# `true` = same fill-everything non-native mode, so re-entering fullscreen still
+# fills the notch area instead of falling back to native (which blacks it out).
+macos-non-native-fullscreen = true
 background-opacity = 1
-window-padding-x = 14
-window-padding-y = 14
+macos-window-shadow = false
+# Right Option = Alt/Meta so Neovim/tmux M-/Alt- bindings work (e.g. snacks
+# picker <A-w> cycle_win), including Caps Lock remapped to Option (which macOS
+# sends as Right Option); left Option still types special chars like Ω.
+macos-option-as-alt = right
+window-padding-x = 0
+window-padding-y = 0
 # Spread the leftover space (window height not evenly divisible by cell height)
 # across all edges instead of dumping it as a gap on the bottom/right.
 window-padding-balance = true
+# Fill the padding with the nearest cell's actual color rather than the static
+# `background` value. Without this the edges show a gray frame in fullscreen,
+# because the nvim autocmds change the live bg (OSC 11) but padding wouldn't.
+# `extend-always` skips the heuristic that leaves thin gray lines at edges whose
+# row/column has mixed colors (e.g. the tmux status bar).
+window-padding-color = extend-always
+# false = borderless window: removes the macOS chrome that draws a gray
+# rounded-corner outline around the view in non-native fullscreen. Tradeoff:
+# no title bar / traffic-light buttons when running windowed.
+# true = restore the macOS title bar + traffic-light buttons (windowed mode).
 window-decoration = true
 # dimensions in grid cells (columns x rows), mirrors alacritty [window.dimensions]
 window-width = 120
@@ -26,7 +48,7 @@ mouse-scroll-multiplier = 3
 font-family = "JetBrainsMono Nerd Font"
 font-size = 14
 # Alacritty font.offset y = 2 (extra line spacing); closest Ghostty knob:
-adjust-cell-height = 5
+adjust-cell-height = 2
 
 # ─── EVILWARE palette ────────────────────────────────────────────────────────
 background = 000000

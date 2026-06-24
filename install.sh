@@ -14,6 +14,10 @@ fi
 mkdir -p "$LAZYGIT_DIR"
 ln -sf ~/dotfiles/lazygit.yml "$LAZYGIT_DIR/config.yml"
 
+# gh-dash (GitHub CLI dashboard) config
+mkdir -p ~/.config/gh-dash
+ln -sf ~/dotfiles/gh-dash/config.yml ~/.config/gh-dash/config.yml
+
 # tmux helper scripts (referenced from tmux.conf status-right)
 mkdir -p ~/.tmux/scripts
 ln -sf ~/dotfiles/tmux/scripts/git-branch.sh ~/.tmux/scripts/git-branch.sh

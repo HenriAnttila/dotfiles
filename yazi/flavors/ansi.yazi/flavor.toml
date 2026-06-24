@@ -1,0 +1,187 @@
+# ANSI flavor — follows the terminal's 16-color palette instead of hardcoding
+# hex. Your nvim pushes its colorscheme into the terminal via OSC 4 (the
+# set_palette autocmd) + OSC 11 for bg, so this flavor automatically matches
+# whatever theme nvim last set. `reset` = terminal default fg/bg.
+#
+# Palette mapping (ANSI index -> nvim's terminal_color_N):
+#   reset = default fg/bg   black = 0    darkgray = 8 (muted/borders)
+#   red = 1   green = 2   yellow = 3   blue = 4   magenta = 5   cyan = 6
+#   gray = 7  light* = 9..14   white = 15
+
+[app]
+overall = { bg = "reset" }
+
+[mgr]
+cwd = { fg = "cyan", bold = true }
+
+# Find
+find_keyword  = { fg = "cyan", reversed = true }
+find_position = { fg = "cyan", bold = true, italic = true }
+
+# Marker
+marker_copied   = { fg = "green",   bg = "green" }
+marker_cut      = { fg = "red",     bg = "red" }
+marker_marked   = { fg = "cyan",    bg = "cyan" }
+marker_selected = { fg = "cyan",    bg = "cyan" }
+
+# Count
+count_copied   = { fg = "green", bold = true, reversed = true }
+count_cut      = { fg = "red",   bold = true, reversed = true }
+count_selected = { fg = "cyan",  bold = true, reversed = true }
+
+# Border
+border_symbol = "│"
+border_style  = { fg = "darkgray" }
+
+[indicator]
+parent  = { underline = true }
+current = { fg = "reset", bg = "darkgray" }
+preview = { underline = true }
+padding = { open = "█", close = "█" }
+
+[tabs]
+active    = { fg = "reset",    bg = "darkgray", bold = true }
+inactive  = { fg = "darkgray", bg = "reset" }
+sep_inner = { open = "", close = "" }
+sep_outer = { open = "", close = "" }
+
+[mode]
+# Normal mode
+normal_main = { fg = "reset",    bg = "darkgray", bold = true }
+normal_alt  = { fg = "darkgray", bg = "reset" }
+
+# Select mode
+select_main = { fg = "black", bg = "cyan", bold = true }
+select_alt  = { fg = "cyan",  bg = "reset" }
+
+# Unset mode
+unset_main = { fg = "black",   bg = "magenta", bold = true }
+unset_alt  = { fg = "magenta", bg = "reset" }
+
+[status]
+overall = { fg = "reset" }
+
+# Permissions
+perm_type  = { fg = "blue" }
+perm_read  = { fg = "yellow" }
+perm_write = { fg = "red" }
+perm_exec  = { fg = "green" }
+perm_sep   = { fg = "darkgray" }
+
+# Progress
+progress_label  = { fg = "black" }
+progress_normal = { fg = "cyan", bg = "darkgray" }
+progress_error  = { bg = "red" }
+
+[which]
+cols           = 3
+mask           = { bg = "black" }
+cand           = { fg = "cyan", bold = true }
+rest           = { fg = "cyan", italic = true }
+desc           = { fg = "darkgray" }
+separator      = " "
+separator_style = { }
+
+[confirm]
+border = { fg = "darkgray" }
+title  = { fg = "reset", bold = true }
+body   = { fg = "reset", bold = true }
+list   = { fg = "reset" }
+btn_yes = { fg = "reset",    bg = "darkgray", bold = true }
+btn_no  = { fg = "darkgray", bg = "reset" }
+
+[spot]
+border   = { fg = "darkgray" }
+title    = { fg = "reset", bold = true }
+tbl_col  = { fg = "darkgray" }
+tbl_cell = { fg = "reset", bg = "darkgray" }
+
+[notify]
+title_info  = { fg = "blue" }
+title_warn  = { fg = "yellow" }
+title_error = { fg = "red" }
+
+[pick]
+border   = { fg = "darkgray", bold = true }
+active   = { fg = "reset" }
+inactive = { fg = "darkgray" }
+
+[input]
+border   = { fg = "darkgray" }
+title    = { fg = "reset", bold = true }
+value    = { fg = "reset" }
+selected = { bg = "darkgray" }
+
+[cmp]
+border   = { fg = "darkgray", bold = true }
+active   = { fg = "reset", bg = "darkgray" }
+inactive = { fg = "darkgray" }
+
+[tasks]
+border  = { fg = "darkgray" }
+title   = { fg = "reset", bold = true }
+hovered = { fg = "reset", bg = "darkgray" }
+
+[help]
+on      = { fg = "blue" }
+run     = { fg = "cyan" }
+desc    = { fg = "darkgray", italic = true }
+hovered = { bg = "darkgray" }
+footer  = { fg = "black", bg = "cyan", bold = true }
+
+[filetype]
+rules = [
+  # Empty files
+  { mime = "inode/empty", fg = "darkgray" },
+
+  # Special files
+  { url = "*",  is = "orphan", fg = "darkgray" },
+  { url = "*/", is = "orphan", fg = "darkgray" },
+  { url = "*",  is = "link",   fg = "cyan" },
+  { url = "*/", is = "link",   fg = "cyan" },
+  { url = "*",  is = "block",  fg = "reset" },
+  { url = "*",  is = "char",   fg = "reset" },
+  { url = "*",  is = "fifo",   fg = "magenta" },
+  { url = "*",  is = "sock",   fg = "magenta" },
+  { url = "*",  is = "sticky", fg = "reset" },
+  { url = "*",  is = "dummy",  fg = "darkgray" },
+
+  # Fallback
+  { url = "*/", fg = "blue" },
+  { url = "*", is = "exec", fg = "green" },
+  { url = "*", fg = "reset" }
+]
+
+[icon]
+prepend_dirs = [
+  { name = ".config",     text = "", fg = "blue" },
+  { name = ".git",        text = "", fg = "blue" },
+  { name = ".github",     text = "", fg = "blue" },
+  { name = ".npm",        text = "", fg = "blue" },
+  { name = "Desktop",     text = "", fg = "blue" },
+  { name = "Development", text = "", fg = "blue" },
+  { name = "Documents",   text = "", fg = "blue" },
+  { name = "Downloads",   text = "", fg = "blue" },
+  { name = "Library",     text = "", fg = "blue" },
+  { name = "Movies",      text = "", fg = "blue" },
+  { name = "Music",       text = "", fg = "blue" },
+  { name = "Pictures",    text = "", fg = "blue" },
+  { name = "Public",      text = "", fg = "blue" },
+  { name = "Videos",      text = "", fg = "blue" }
+]
+prepend_conds = [
+  # Special files
+  { if = "orphan", text = "", fg = "darkgray" },
+  { if = "link",   text = "", fg = "cyan" },
+  { if = "block",  text = "", fg = "reset" },
+  { if = "char",   text = "", fg = "reset" },
+  { if = "fifo",   text = "", fg = "magenta" },
+  { if = "sock",   text = "", fg = "magenta" },
+  { if = "sticky", text = "", fg = "reset" },
+  { if = "dummy",  text = "", fg = "darkgray" },
+
+  # Fallback
+  { if = "dir",   text = "", fg = "blue" },
+  { if = "exec",  text = "", fg = "green" },
+  { if = "!dir",  text = "", fg = "darkgray" }
+]

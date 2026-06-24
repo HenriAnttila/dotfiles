@@ -1,3 +1,6 @@
+# `ansi` follows the terminal palette (synced from nvim via OSC 4), so yazi
+# matches whatever colorscheme nvim last set. Swap back to "flexoki-dark" for
+# the static hardcoded look.
 [flavor]
-dark = "flexoki-dark"
-light = "flexoki-dark"
+dark = "ansi"
+light = "ansi"

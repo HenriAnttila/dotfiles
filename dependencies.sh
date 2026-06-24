@@ -22,6 +22,20 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
     sudo apt install -y nodejs
 
+    # Install GitHub CLI (gh) from the official apt repo
+    if ! command -v gh &>/dev/null; then
+      echo "Installing GitHub CLI..."
+      (type -p wget >/dev/null || sudo apt install -y wget)
+      sudo mkdir -p -m 755 /etc/apt/keyrings
+      wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+        | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg >/dev/null
+      sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+        | sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null
+      sudo apt update
+      sudo apt install -y gh
+    fi
+
     # Install lazygit
     echo "Installing lazygit..."
     LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
@@ -53,7 +67,8 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
       neovim \
       nodejs \
       npm \
-      lazygit
+      lazygit \
+      github-cli
 
     echo "✓ Dependencies installed!"
 
@@ -80,6 +95,12 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     sudo dnf copr enable atim/lazygit -y
     sudo dnf install -y lazygit
 
+    # Install GitHub CLI (gh)
+    echo "Installing GitHub CLI..."
+    sudo dnf install -y 'dnf-command(config-manager)'
+    sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+    sudo dnf install -y gh
+
     echo "✓ Dependencies installed!"
   fi
 
@@ -99,8 +120,17 @@ elif [[ "$OSTYPE" == "darwin"* ]]; then
     lazygit \
     neovim \
     node \
-    python
+    python \
+    gh
   echo "✓ Dependencies installed!"
+fi
+
+# Install gh-dash (GitHub CLI dashboard extension) — cross-platform via gh
+if command -v gh &>/dev/null; then
+  echo "Installing gh-dash..."
+  gh extension install dlvhdr/gh-dash 2>/dev/null \
+    || gh extension upgrade dlvhdr/gh-dash 2>/dev/null \
+    || true
 fi
 
 echo ""
@@ -110,6 +140,8 @@ nvim --version | grep -i luajit && echo "✓ LuaJIT support detected" || echo "�
 node --version 2>/dev/null && echo "✓ Node.js installed" || echo "⚠ Node.js not found"
 python3 --version && echo "✓ Python installed" || echo "⚠ Python not found"
 lazygit --version 2>/dev/null && echo "✓ lazygit installed" || echo "⚠ lazygit not found"
+gh --version 2>/dev/null | head -n 1 && echo "✓ gh installed" || echo "⚠ gh not found"
+gh dash --version 2>/dev/null | tail -n 1 && echo "✓ gh-dash installed" || echo "⚠ gh-dash not found"
 echo ""
 echo "Run ./install.sh to set up your config!"
 

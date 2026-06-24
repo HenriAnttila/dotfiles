@@ -3,4 +3,10 @@
 -- status bar also sitting at the top.
 return {
   { "akinsho/bufferline.nvim", enabled = false },
+  {
+    "kiennt63/harpoon-files.nvim",
+    dependencies = {
+      { "ThePrimeagen/harpoon", branch = "harpoon2" },
+    },
+  },
 }

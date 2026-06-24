@@ -5,9 +5,10 @@
 
 # ─── Window Settings ─────────────────────────────────────────────────────────
 [window]
-opacity = 0.88
+opacity = 1.0
 padding = { x = 14, y = 14 }
-decorations = "None"
+decorations = "Full"
+option_as_alt = "OnlyLeft"  # macOS: left Option = Alt/Meta (tmux M- bindings); right Option still types special chars
 #dynamic_padding = true
 title = "Alacritty"
 dynamic_title = true
@@ -28,19 +29,19 @@ multiplier = 3
 size = 16.5  # 16.5pt x 96/72 = 22px = native Terminess bitmap strike (crisp)
 
 [font.normal]
-family = "Terminess Nerd Font"
+family = "Monaspace Krypton NF"
 style = "Regular"
 
 [font.bold]
-family = "Terminess Nerd Font"
+family = "Monaspace Krypton NF"
 style = "Bold"
 
 [font.italic]
-family = "Terminess Nerd Font"
+family = "Monaspace Krypton NF"
 style = "Italic"
 
 [font.bold_italic]
-family = "Terminess Nerd Font"
+family = "Monaspace Krypton NF"
 style = "Bold Italic"
 
 [font.offset]
@@ -157,6 +158,12 @@ TERM = "xterm-256color"
 
 
 # ─── Keyboard Bindings ───────────────────────────────────────────────────────
+# Send NUL (0x00) on Ctrl+Space so tmux receives its C-Space prefix.
+[[keyboard.bindings]]
+key = "Space"
+mods = "Control"
+chars = "\u0000"
+
 [[keyboard.bindings]]
 key = "Return"
 mods = "Shift"
