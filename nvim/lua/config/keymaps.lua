@@ -31,3 +31,11 @@ vim.keymap.set("n", "<leader>o", function()
   vim.api.nvim_win_set_cursor(0, { line + offset, 0 })
   vim.cmd("startinsert")
 end, { desc = "Insert line with padding" })
+
+-- Use mini.files as the primary file explorer (replaces the default snacks explorer).
+vim.keymap.set("n", "<leader>e", function()
+  local files = require("mini.files")
+  if not files.close() then
+    files.open(vim.api.nvim_buf_get_name(0), true)
+  end
+end, { desc = "Explorer (mini.files)" })
