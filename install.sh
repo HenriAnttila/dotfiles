@@ -30,6 +30,10 @@ python3 -m pip install --user --break-system-packages libtmux 2>/dev/null \
   || python3 -m pip install --user libtmux
 command -v python >/dev/null && python -m pip install libtmux 2>/dev/null || true
 
+# Claude Code global instructions
+mkdir -p ~/.claude
+ln -sf ~/dotfiles/.claude/CLAUDE.md ~/.claude/CLAUDE.md
+
 # Add other symlinks as needed
 # ln -sf ~/dotfiles/bashrc ~/.bashrc
 # ln -sf ~/dotfiles/tmux.conf ~/.tmux.conf
