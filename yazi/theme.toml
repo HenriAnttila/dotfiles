@@ -4,3 +4,11 @@
 [flavor]
 dark = "ansi"
 light = "ansi"
+
+# The `ansi` flavor's folder glyphs got stripped (Nerd Font private-use chars
+# were lost when the flavor file was saved), so folders rendered with no icon.
+# Re-add them here at the user level — a user theme.toml wins over the flavor.
+[icon]
+prepend_conds = [
+  { if = "dir", text = "", fg = "blue" },
+]

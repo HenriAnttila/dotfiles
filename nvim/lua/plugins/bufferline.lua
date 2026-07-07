@@ -8,5 +8,12 @@ return {
     dependencies = {
       { "ThePrimeagen/harpoon", branch = "harpoon2" },
     },
+    main = "harpoon_files",
+    opts = {
+      max_length = 20,
+      show_icon = true,
+      show_index = true,
+      show_filename = true,
+    },
   },
 }

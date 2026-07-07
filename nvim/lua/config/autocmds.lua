@@ -111,3 +111,40 @@ vim.api.nvim_create_autocmd({ "UIEnter", "ColorScheme" }, {
 vim.api.nvim_create_autocmd("UILeave", {
   callback = function() reset_bg() end,
 })
+
+-- Skeleton for new .jsx files: insert a default-export arrow component named
+-- after the file. For the `index.jsx` folder-component convention, name it
+-- after the parent folder instead (so Foo/index.jsx -> `Foo`).
+vim.api.nvim_create_autocmd("BufNewFile", {
+  pattern = "*.jsx",
+  callback = function(args)
+    local path = args.file
+    local stem = vim.fn.fnamemodify(path, ":t:r")
+    if stem == "index" then
+      stem = vim.fn.fnamemodify(path, ":h:t")
+    end
+    -- Make a safe PascalCase-ish identifier (strip non-word chars).
+    local name = (stem:gsub("[^%w_]", ""))
+    if name == "" then
+      name = "Component"
+    end
+
+    -- Expand as a snippet (JetBrains-style tab stops): $1 = props, $2 = JSX
+    -- body, $0 = final cursor. Jump fields with <Tab>/<S-Tab> (LazyVim default).
+    local snippet = table.concat({
+      "const " .. name .. " = ({ ${1} }) => {",
+      "  return (",
+      "    <div>${2}</div>",
+      "  );",
+      "};",
+      "",
+      "export default " .. name .. ";$0",
+    }, "\n")
+    -- Defer so it runs after the BufNewFile handler returns, with the cursor
+    -- on the empty buffer's first line.
+    vim.schedule(function()
+      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+      vim.snippet.expand(snippet)
+    end)
+  end,
+})
