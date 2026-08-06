@@ -2,8 +2,19 @@
 -- folder (root_dir), and the clock.
 return {
   "nvim-lualine/lualine.nvim",
+  dependencies = { "f-person/git-blame.nvim" },
   opts = function(_, opts)
     local s = opts.sections
+
+    -- Current-line git blame (author • relative date • summary). Only shows
+    -- when blame info is available for the line under the cursor.
+    local ok_blame, git_blame = pcall(require, "gitblame")
+    if ok_blame then
+      table.insert(s.lualine_x, 1, {
+        git_blame.get_current_blame_text,
+        cond = git_blame.is_blame_text_available,
+      })
+    end
 
     -- git branch lives alone in section b
     s.lualine_b = {}
