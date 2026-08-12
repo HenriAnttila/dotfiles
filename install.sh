@@ -1,9 +1,10 @@
 #!/bin/bash
 
-# Symlink configs
-ln -sf ~/dotfiles/nvim ~/.config/nvim
-ln -sf ~/dotfiles/yazi ~/.config/yazi
-ln -sf ~/dotfiles/ghostty ~/.config/ghostty
+# Symlink configs. -n is required for directories: without it a re-run follows
+# the existing symlink and creates a self-referential link *inside* the target.
+ln -sfn ~/dotfiles/nvim ~/.config/nvim
+ln -sfn ~/dotfiles/yazi ~/.config/yazi
+ln -sfn ~/dotfiles/ghostty ~/.config/ghostty
 
 # lazygit (config path differs between macOS and Linux)
 if [[ "$OSTYPE" == "darwin"* ]]; then
