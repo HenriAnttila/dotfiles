@@ -35,11 +35,3 @@ end, { desc = "Insert line with padding" })
 -- Split right with <leader>i (I = vertical divider), mirroring tmux Alt+i.
 -- Keeps LazyVim's <leader>- (split below) and <leader>| working too.
 vim.keymap.set("n", "<leader>i", "<C-W>v", { desc = "Split Window Right", remap = true })
-
--- Use mini.files as the primary file explorer (replaces the default snacks explorer).
-vim.keymap.set("n", "<leader>e", function()
-  local files = require("mini.files")
-  if not files.close() then
-    files.open(vim.api.nvim_buf_get_name(0), true)
-  end
-end, { desc = "Explorer (mini.files)" })

@@ -51,23 +51,4 @@ function M.create(dir, name)
   return comp_path
 end
 
--- mini.files mapping action: create a barrel in the directory under the cursor.
-function M.mini_action()
-  local mf = require("mini.files")
-  local entry = mf.get_fs_entry()
-
-  local dir
-  if entry then
-    dir = entry.fs_type == "directory" and entry.path or vim.fs.dirname(entry.path)
-  else
-    dir = vim.uv.cwd()
-  end
-
-  vim.ui.input({ prompt = "Component name: " }, function(name)
-    if M.create(dir, name) then
-      mf.synchronize() -- pick up the new files on disk, keep explorer open
-    end
-  end)
-end
-
 return M
