@@ -25,8 +25,22 @@ local function reset_bg()
   end
 end
 
--- Make the background transparent on every theme change so the terminal
--- (and its blur/wallpaper) shows through.
+-- Remember the last real Normal background. make_transparent() below clears
+-- Normal.bg, and UIEnter can fire *after* that has already run, so reading the
+-- highlight at that point returns nil. Caching keeps a color available.
+local last_bg
+
+local function normal_bg()
+  local ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = "Normal", link = false })
+  if ok and hl and hl.bg then
+    last_bg = hl.bg
+  end
+  return last_bg
+end
+
+-- Strip nvim's own background on every theme change. The terminal itself is
+-- painted the same color via OSC 11 below, so this leaves no seam between the
+-- buffer, the window padding, and the tmux status bar.
 local transparent_groups = {
   "Normal",
   "NormalNC",
@@ -98,9 +112,18 @@ end
 
 vim.api.nvim_create_autocmd({ "UIEnter", "ColorScheme" }, {
   callback = function()
+    -- Read Normal.bg before make_transparent() clears it.
+    local bg = normal_bg()
     make_transparent()
-    -- Background is now transparent, so let the terminal's own bg show through.
-    reset_bg()
+    -- Paint the terminal itself the colorscheme's background. ghostty's
+    -- window-padding-color=extend-always makes the padding follow, and the tmux
+    -- status bar is bg=default, so the whole window ends up one colour.
+    if bg then
+      set_bg(bg)
+    else
+      -- Theme defines no Normal bg; fall back to the terminal's own default.
+      reset_bg()
+    end
     -- Sync the tmux status-bar accent to this colorscheme.
     set_accent()
     -- Sync the terminal's ANSI palette to this colorscheme.
@@ -108,9 +131,10 @@ vim.api.nvim_create_autocmd({ "UIEnter", "ColorScheme" }, {
   end,
 })
 
-vim.api.nvim_create_autocmd("UILeave", {
-  callback = function() reset_bg() end,
-})
+-- Deliberately no UILeave reset: the background persists after nvim exits, the
+-- same way set_palette() leaves the ANSI palette in place, so the shell keeps
+-- the theme instead of snapping back to ghostty's static `background`. Add
+-- `vim.api.nvim_create_autocmd("UILeave", { callback = reset_bg })` to undo.
 
 -- Skeleton for new .jsx files: insert a default-export arrow component named
 -- after the file. For the `index.jsx` folder-component convention, name it
