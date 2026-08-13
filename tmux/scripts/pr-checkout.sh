@@ -30,13 +30,27 @@ trap 'rm -rf "$tmpdir"' EXIT
 json="$tmpdir/prs.json"
 
 # One network round-trip for everything the picker and preview need.
-if ! gh pr list --limit 100 \
-	--json number,title,author,headRefName,baseRefName,state,isDraft,additions,deletions,changedFiles,updatedAt,body \
+#
+# Two things dominate how long this takes, both measured against a busy repo:
+#   --limit 100 makes gh page through the API   ~6.0s -> 1.8s at limit 30
+#   additions/deletions/changedFiles cost ~1.2s, since gh fetches each PR's
+#   diff stats                                  ~1.8s -> 0.6s without them
+# Hence limit 30 and no diffstat in the preview: ~10x faster to open, for one
+# line of detail. Add the fields back to --json and to preview.jq if you want
+# the +/- counts and can live with the wait.
+LIMIT=30
+if ! gh pr list --limit "$LIMIT" \
+	--json number,title,author,headRefName,baseRefName,state,isDraft,updatedAt,body \
 	>"$json" 2>"$tmpdir/err"; then
 	die "gh pr list failed:\n$(cat "$tmpdir/err")"
 fi
 
-[ "$(jq -r 'length' "$json")" != "0" ] || die "no open PRs"
+count=$(jq -r 'length' "$json")
+[ "$count" != "0" ] || die "no open PRs"
+
+# Say so rather than silently truncating: a full page means there may be more.
+header='enter: checkout    ctrl-o: open in browser    esc: cancel'
+[ "$count" -lt "$LIMIT" ] || header="showing first $LIMIT open PRs    $header"
 
 # Preview filter lives in its own file so it needs no shell escaping.
 cat >"$tmpdir/preview.jq" <<'JQ'
@@ -45,7 +59,6 @@ cat >"$tmpdir/preview.jq" <<'JQ'
   "author   \(.author.login)\n" +
   "branch   \(.headRefName) -> \(.baseRefName)\n" +
   "state    \(.state)\(if .isDraft then " (draft)" else "" end)\n" +
-  "changes  +\(.additions) -\(.deletions) in \(.changedFiles) files\n" +
   "updated  \(.updatedAt[0:10])\n\n" +
   "--------------------------------------------\n\n" +
   (if (.body // "") == "" then "(no description)" else .body end)
@@ -68,7 +81,7 @@ chmod +x "$tmpdir/open.sh"
 branch=$(jq -r '.[] | [.headRefName, .title] | @tsv' "$json" |
 	column -t -s "$(printf '\t')" |
 	fzf --height=100% \
-		--header='enter: checkout    ctrl-o: open in browser    esc: cancel' \
+		--header="$header" \
 		--preview="jq -r --arg b {1} -f '$tmpdir/preview.jq' '$json'" \
 		--preview-window=right:50%:wrap \
 		--bind="ctrl-o:execute-silent('$tmpdir/open.sh' {1})" |
