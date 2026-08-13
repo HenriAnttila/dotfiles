@@ -7,9 +7,30 @@
 -- Or remove existing autocmds by their group name (which is prefixed with `lazyvim_` for the defaults)
 -- e.g. vim.api.nvim_del_augroup_by_name("lazyvim_wrap_spell")
 
+-- Scale a #rrggbb string's channels by f (0..1). Multiplying rather than
+-- subtracting keeps hue and saturation, and is self-limiting: a theme that is
+-- already near-black barely moves, while a lighter one drops a lot.
+local function darken(hex, f)
+  local function chan(i)
+    return tonumber(hex:sub(i, i + 1), 16)
+  end
+  return string.format(
+    "#%02x%02x%02x",
+    math.floor(chan(2) * f + 0.5),
+    math.floor(chan(4) * f + 0.5),
+    math.floor(chan(6) * f + 0.5)
+  )
+end
+
+-- How much to deepen the colorscheme's background before painting the terminal
+-- with it. 1.0 = the theme's exact bg. Lighter themes look washed out at full
+-- brightness across a whole window; scaling preserves the differences between
+-- themes instead of flattening them all to one near-black.
+local BG_DARKEN = 0.7
+
 -- Sync terminal background with Neovim colorscheme (hides padding)
 local function set_bg(color)
-  local hex = string.format("#%06x", color)
+  local hex = darken(string.format("#%06x", color), BG_DARKEN)
   if vim.env.TMUX then
     io.write(string.format("\027Ptmux;\027\027]11;%s\007\027\\", hex))
   else
@@ -79,19 +100,9 @@ local function set_accent()
     accent = string.format("#%06x", hl.fg)
   end
   vim.fn.jobstart({ "tmux", "set", "-g", "@accent", accent })
-  -- A muted version for pane borders: same hue/saturation, just dimmer
-  -- (brightness scaled down) so the active split is the accent but not loud.
-  local function chan(h, i)
-    return tonumber(h:sub(i, i + 1), 16)
-  end
-  local f = 0.6 -- brightness scale; lower = darker/quieter
-  local dim = string.format(
-    "#%02x%02x%02x",
-    math.floor(chan(accent, 2) * f + 0.5),
-    math.floor(chan(accent, 4) * f + 0.5),
-    math.floor(chan(accent, 6) * f + 0.5)
-  )
-  vim.fn.jobstart({ "tmux", "set", "-g", "@accent_dim", dim })
+  -- A muted version for pane borders: same hue/saturation, just dimmer, so the
+  -- active split is the accent but not loud.
+  vim.fn.jobstart({ "tmux", "set", "-g", "@accent_dim", darken(accent, 0.6) })
 end
 
 -- Sync the terminal's 16-color ANSI palette (OSC 4) to the colorscheme so the
