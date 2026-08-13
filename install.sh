@@ -44,6 +44,13 @@ for skill in ~/dotfiles/claude/skills/*/; do
   ln -sfn "$skill" ~/.claude/skills/"$(basename "$skill")"
 done
 
+# zsh aliases. ~/.zshrc itself is not tracked (it holds machine-generated nvm,
+# conda, and bun bootstrap), so hook the tracked aliases in with a source line.
+ZSH_SOURCE_LINE='[ -f "$HOME/dotfiles/zsh/aliases.zsh" ] && source "$HOME/dotfiles/zsh/aliases.zsh"'
+if ! grep -qF 'dotfiles/zsh/aliases.zsh' ~/.zshrc 2>/dev/null; then
+  echo "$ZSH_SOURCE_LINE" >>~/.zshrc
+fi
+
 # Add other symlinks as needed
 # ln -sf ~/dotfiles/bashrc ~/.bashrc
 # ln -sf ~/dotfiles/tmux.conf ~/.tmux.conf
