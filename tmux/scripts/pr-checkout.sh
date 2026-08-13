@@ -60,12 +60,19 @@ n=\$(jq -r --arg b "\$1" '.[] | select(.headRefName == \$b) | .number' "$json")
 EOF
 chmod +x "$tmpdir/open.sh"
 
-branch=$(jq -r '.[].headRefName' "$json" |
+# Branch first so it reads as the left column, title after it so fzf can match
+# on it. The title has to be visible to be searchable: --with-nth hides a field
+# from the query as well as from the display, so there is no hidden-but-
+# searchable option. Branch names cannot contain spaces, so {1} is always the
+# whole branch even after column(1) turns the tab into padding.
+branch=$(jq -r '.[] | [.headRefName, .title] | @tsv' "$json" |
+	column -t -s "$(printf '\t')" |
 	fzf --height=100% \
 		--header='enter: checkout    ctrl-o: open in browser    esc: cancel' \
-		--preview="jq -r --arg b {} -f '$tmpdir/preview.jq' '$json'" \
-		--preview-window=right:60%:wrap \
-		--bind="ctrl-o:execute-silent('$tmpdir/open.sh' {})")
+		--preview="jq -r --arg b {1} -f '$tmpdir/preview.jq' '$json'" \
+		--preview-window=right:50%:wrap \
+		--bind="ctrl-o:execute-silent('$tmpdir/open.sh' {1})" |
+	awk '{print $1}')
 
 # Empty means escape — not an error, just leave.
 [ -n "$branch" ] || exit 0
