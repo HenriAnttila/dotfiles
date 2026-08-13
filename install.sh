@@ -22,6 +22,8 @@ ln -sf ~/dotfiles/gh-dash/config.yml ~/.config/gh-dash/config.yml
 # tmux helper scripts (referenced from tmux.conf status-right)
 mkdir -p ~/.tmux/scripts
 ln -sf ~/dotfiles/tmux/scripts/git-branch.sh ~/.tmux/scripts/git-branch.sh
+# PR picker bound to Alt+p (needs gh + fzf, see dependencies.sh)
+ln -sf ~/dotfiles/tmux/scripts/pr-checkout.sh ~/.tmux/scripts/pr-checkout.sh
 
 # tmux-window-name plugin needs libtmux. Its launcher checks bare `python`
 # (which may be anaconda/another interpreter), while the rename script uses
