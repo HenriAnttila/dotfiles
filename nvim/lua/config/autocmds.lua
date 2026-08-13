@@ -22,15 +22,31 @@ local function darken(hex, f)
   )
 end
 
--- How much to deepen the colorscheme's background before painting the terminal
--- with it. 1.0 = the theme's exact bg. Lighter themes look washed out at full
--- brightness across a whole window; scaling preserves the differences between
--- themes instead of flattening them all to one near-black.
-local BG_DARKEN = 0.7
+-- Target brightness for the terminal background: the value the *brightest*
+-- channel gets scaled to. 0x0a is near-black. Raise for a lighter backdrop.
+local BG_LEVEL = 0x0a
+
+-- Pin a colour to BG_LEVEL while keeping its hue. Scaling by the peak channel
+-- (rather than by a flat factor) puts every theme at the same depth, so what
+-- separates them is only their colour cast -- kanagawa's blue, rose-pine's
+-- violet -- and not their lightness. A flat factor would instead shrink those
+-- differences along with the brightness, which is what washes them out.
+-- Never brightens: a theme already darker than BG_LEVEL is left as it is.
+local function near_black(hex)
+  local function chan(i)
+    return tonumber(hex:sub(i, i + 1), 16)
+  end
+  local r, g, b = chan(2), chan(4), chan(6)
+  local peak = math.max(r, g, b)
+  if peak == 0 then
+    return "#000000"
+  end
+  return darken(hex, math.min(1, BG_LEVEL / peak))
+end
 
 -- Sync terminal background with Neovim colorscheme (hides padding)
 local function set_bg(color)
-  local hex = darken(string.format("#%06x", color), BG_DARKEN)
+  local hex = near_black(string.format("#%06x", color))
   if vim.env.TMUX then
     io.write(string.format("\027Ptmux;\027\027]11;%s\007\027\\", hex))
   else
