@@ -35,11 +35,15 @@ command -v python >/dev/null && python -m pip install libtmux 2>/dev/null || tru
 mkdir -p ~/.claude
 ln -sf ~/dotfiles/.claude/CLAUDE.md ~/.claude/CLAUDE.md
 
-# Claude Code personal skills. Symlinked per-skill, not as a whole directory:
-# ~/.claude/skills also holds skills installed from plugin marketplaces, and a
-# directory-level symlink would hide them. Third-party skills belong in
-# settings.json under enabledPlugins, not here.
+# Claude Code personal skills — only skills written here, never downloaded ones.
+# Third-party skills are installed from a marketplace instead (see
+# enabledPlugins in ~/.claude/settings.json) so they stay versioned and
+# updatable via `claude plugin update`.
+#
+# Symlinked per-skill, not as a whole directory: ~/.claude/skills also holds
+# marketplace-installed skills, and a directory-level symlink would hide them.
 mkdir -p ~/.claude/skills
+find ~/.claude/skills -maxdepth 1 -type l ! -exec test -e {} \; -delete  # prune dead links
 for skill in ~/dotfiles/claude/skills/*/; do
   ln -sfn "$skill" ~/.claude/skills/"$(basename "$skill")"
 done
