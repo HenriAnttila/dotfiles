@@ -6,7 +6,8 @@
 # scrolling lazygit's remote-branches list, which shows bare branch names with
 # no PR numbers or titles.
 #
-# Errors pause for a keypress so the popup doesn't flash past unread.
+# Errors exit non-zero, which is why the binding uses -EE: the popup stays open
+# on failure so the message is readable, and closes by itself on success.
 
 set -uo pipefail
 
@@ -14,8 +15,6 @@ TAB=$'\t'
 
 die() {
 	printf '\n%s\n\n' "$*" >&2
-	printf 'press any key…' >&2
-	read -rsn1
 	exit 1
 }
 
