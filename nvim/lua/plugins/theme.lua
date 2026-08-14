@@ -1,9 +1,18 @@
-local function applySnackStyling(color)
-  color = color or "#242423"
-  vim.api.nvim_set_hl(0, "SnacksIndent", { fg = color })
-  vim.api.nvim_set_hl(0, "SnacksIndentScope", { fg = color })
-  vim.api.nvim_set_hl(0, "SnacksIndentChunk", { fg = color })
-  vim.api.nvim_set_hl(0, "LineNr", { fg = color })
+-- Indent guides and line numbers are pinned to fixed colors rather than each
+-- theme's, because the background is forced to one color regardless of theme,
+-- so per-theme values drift against it.
+--
+-- They used to share a single value. Line numbers need to read as text, indent
+-- guides only need to hint, so line numbers get their own, lighter one. For
+-- reference the themes' own LineNr sits around #505050-#6e6a86, so this is
+-- still well below what they'd pick.
+local function applySnackStyling(indent, linenr)
+  indent = indent or "#242423"
+  linenr = linenr or "#3a3a38"
+  vim.api.nvim_set_hl(0, "SnacksIndent", { fg = indent })
+  vim.api.nvim_set_hl(0, "SnacksIndentScope", { fg = indent })
+  vim.api.nvim_set_hl(0, "SnacksIndentChunk", { fg = indent })
+  vim.api.nvim_set_hl(0, "LineNr", { fg = linenr })
 end
 
 -- Apply my indent-guide + LineNr colors on every colorscheme, not just vesper.
