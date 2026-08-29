@@ -31,6 +31,12 @@ ln -sf ~/dotfiles/tmux/scripts/pr-checkout.sh ~/.tmux/scripts/pr-checkout.sh
 # for the SSH segment in status-right)
 ln -sf ~/dotfiles/tmux/scripts/ssh-target.sh ~/.tmux/scripts/ssh-target.sh
 ln -sf ~/dotfiles/tmux/scripts/ssh-open.sh ~/.tmux/scripts/ssh-open.sh
+# SSH mode: the toggle, the remote program runner, and the script that builds
+# the sshmode key table from root plus tmux/sshmode.conf
+ln -sf ~/dotfiles/tmux/scripts/ssh-mode.sh ~/.tmux/scripts/ssh-mode.sh
+ln -sf ~/dotfiles/tmux/scripts/ssh-run.sh ~/.tmux/scripts/ssh-run.sh
+ln -sf ~/dotfiles/tmux/scripts/ssh-mode-table.sh ~/.tmux/scripts/ssh-mode-table.sh
+ln -sf ~/dotfiles/tmux/sshmode.conf ~/.tmux/sshmode.conf
 
 # tmux-window-name plugin needs libtmux. Its launcher checks bare `python`
 # (which may be anaconda/another interpreter), while the rename script uses

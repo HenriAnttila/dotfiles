@@ -1,6 +1,7 @@
 #!/bin/sh
 # Open a new pane or window, following ssh into it.
-# Usage: ssh-open.sh <-h|-v|-w> <pane_id>   (-h/-v split, -w new window)
+# Usage: ssh-open.sh <-h|-v|-w> <pane_id> [window_index]
+#        (-h/-v split, -w new window; the index is for the Alt+1..9 slots)
 #
 # `-c "#{pane_current_path}"` always opens a local shell, so splitting (or
 # opening a window from) an ssh pane drops you back on the laptop in whatever
@@ -15,17 +16,24 @@
 # `ssh [flags] host` -- what you type by hand -- is unaffected.
 flag="${1:--h}"
 pane="$2"
+index="$3"
 
 # -w is a window, so it takes no direction and no pane target: run-shell gives
 # the script the pane's session through $TMUX, and new-window appends there.
 if [ "$flag" = "-w" ]; then
   set -- new-window
+  [ -n "$index" ] && set -- new-window -t ":$index"
 else
   set -- split-window "$flag" -t "$pane"
 fi
 
 path=$(tmux display -p -t "$pane" '#{pane_current_path}' 2>/dev/null)
-ssh_cmd=$("$(dirname "$0")/ssh-target.sh" "$pane")
+
+# SSH mode pins a host for the whole session, so it wins over what this
+# particular pane happens to be running -- that is what makes the mode work
+# from a local pane. Without the mode, follow the pane itself.
+ssh_cmd=$(tmux show-option -qv @ssh_mode_cmd)
+[ -n "$ssh_cmd" ] || ssh_cmd=$("$(dirname "$0")/ssh-target.sh" "$pane")
 
 if [ -z "$ssh_cmd" ]; then
   exec tmux "$@" -c "$path"
