@@ -20,5 +20,5 @@ fi
 dir=$(tmux display -p -t "$pane" '#{pane_current_path}' 2>/dev/null)
 [ -n "$dir" ] || exit 0
 [ "$dir" = "$HOME" ] && name="~" || name=$(basename "$dir")
-printf '#[fg=%s] #[fg=#cecdc3]%s ' "$accent" "$name"
+printf '#[fg=%s] #[fg=#cecdc3]%s ' "$accent" "$name"
 "$here/git-branch.sh" "$dir"
