@@ -26,11 +26,11 @@ ln -sf ~/dotfiles/tmux/scripts/git-branch.sh ~/.tmux/scripts/git-branch.sh
 ln -sf ~/dotfiles/tmux/scripts/location.sh ~/.tmux/scripts/location.sh
 # PR picker bound to Alt+p (needs gh + fzf, see dependencies.sh)
 ln -sf ~/dotfiles/tmux/scripts/pr-checkout.sh ~/.tmux/scripts/pr-checkout.sh
-# ssh-aware splits: ssh-split.sh re-runs the pane's ssh command in the new pane,
+# ssh-aware splits and windows: ssh-open.sh re-runs the pane's ssh command,
 # ssh-target.sh digs that command out of the process table (location.sh uses it
 # for the SSH segment in status-right)
 ln -sf ~/dotfiles/tmux/scripts/ssh-target.sh ~/.tmux/scripts/ssh-target.sh
-ln -sf ~/dotfiles/tmux/scripts/ssh-split.sh ~/.tmux/scripts/ssh-split.sh
+ln -sf ~/dotfiles/tmux/scripts/ssh-open.sh ~/.tmux/scripts/ssh-open.sh
 
 # tmux-window-name plugin needs libtmux. Its launcher checks bare `python`
 # (which may be anaconda/another interpreter), while the rename script uses
