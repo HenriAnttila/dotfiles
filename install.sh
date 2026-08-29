@@ -22,11 +22,13 @@ ln -sf ~/dotfiles/gh-dash/config.yml ~/.config/gh-dash/config.yml
 # tmux helper scripts (referenced from tmux.conf status-right)
 mkdir -p ~/.tmux/scripts
 ln -sf ~/dotfiles/tmux/scripts/git-branch.sh ~/.tmux/scripts/git-branch.sh
+# status-right "where am I" segment: folder + branch, or SSH + host when remote
+ln -sf ~/dotfiles/tmux/scripts/location.sh ~/.tmux/scripts/location.sh
 # PR picker bound to Alt+p (needs gh + fzf, see dependencies.sh)
 ln -sf ~/dotfiles/tmux/scripts/pr-checkout.sh ~/.tmux/scripts/pr-checkout.sh
 # ssh-aware splits: ssh-split.sh re-runs the pane's ssh command in the new pane,
-# ssh-target.sh digs that command out of the process table (it also feeds the
-# SSH badge in status-right)
+# ssh-target.sh digs that command out of the process table (location.sh uses it
+# for the SSH segment in status-right)
 ln -sf ~/dotfiles/tmux/scripts/ssh-target.sh ~/.tmux/scripts/ssh-target.sh
 ln -sf ~/dotfiles/tmux/scripts/ssh-split.sh ~/.tmux/scripts/ssh-split.sh
 
