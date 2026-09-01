@@ -1,6 +1,11 @@
 #!/bin/sh
 # Reports the ssh session running in a pane, or nothing when the pane is local.
-# Usage: ssh-target.sh [--host] <pane_id>   (e.g. %5)
+# Usage: ssh-target.sh [--host] <pane_id> [tty]   (e.g. %5)
+#
+# The tty is looked up when it is not passed. Callers on the status-bar path
+# pass it (as #{pane_tty}) so that drawing the bar costs no tmux commands: the
+# bar redraws often, and every tmux call from inside a #() job is another
+# client connecting to the server.
 #
 # tmux does not record what was typed: ssh is started from the pane's shell, so
 # #{pane_start_command} is empty and the argv only exists in the process table.
@@ -18,7 +23,8 @@ mode="cmd"
 pane="$1"
 [ -n "$pane" ] || exit 0
 
-tty=$(tmux display -p -t "$pane" '#{pane_tty}' 2>/dev/null)
+tty="$2"
+[ -n "$tty" ] || tty=$(tmux display -p -t "$pane" '#{pane_tty}' 2>/dev/null)
 [ -n "$tty" ] || exit 0
 
 cmd=$(ps -t "$tty" -o stat=,args= 2>/dev/null | awk '
