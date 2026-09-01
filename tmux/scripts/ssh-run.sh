@@ -13,11 +13,11 @@ prog="$*"
 here=$(dirname "$0")
 [ -n "$prog" ] || exit 0
 
+# Same rule as ssh-open.sh: SSH mode decides, not what the pane is running.
 remote=$(tmux show-option -qv @ssh_mode_cmd)
-[ -n "$remote" ] || remote=$("$here/ssh-target.sh" "$pane")
 path=$(tmux display -p -t "$pane" '#{pane_current_path}' 2>/dev/null)
 
-if [ -z "$remote" ]; then           # local pane, no mode: run it here
+if [ -z "$remote" ]; then           # no mode: run it here
   case "$flag" in
     -w) exec tmux new-window -c "$path" "$prog" ;;
     -p) exec tmux display-popup -E -w 90% -h 90% -d "$path" "$prog" ;;

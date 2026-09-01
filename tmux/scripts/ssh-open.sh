@@ -3,12 +3,12 @@
 # Usage: ssh-open.sh <-h|-v|-w> <pane_id> [window_index]
 #        (-h/-v split, -w new window; the index is for the Alt+1..9 slots)
 #
-# `-c "#{pane_current_path}"` always opens a local shell, so splitting (or
-# opening a window from) an ssh pane drops you back on the laptop in whatever
-# local directory ssh was launched from. When the pane is remote, re-run the
-# same ssh command in the new pane instead. The remote directory is not carried
-# over: tmux has no way to know it (that would need OSC 7 from the remote
-# shell), so the new pane starts in the remote $HOME.
+# Outside SSH mode this is a plain split or new window in the current
+# directory. Inside it, the new pane re-runs the ssh command that the mode
+# pinned in @ssh_mode_cmd, so it opens on the server -- whether or not the pane
+# you pressed the key in is the one that is ssh'd. The remote directory is not
+# carried over: tmux has no way to know it (that would need OSC 7 from the
+# remote shell), so the new pane starts in the remote $HOME.
 #
 # The command is recovered from ps, which prints argv unquoted, so an ssh
 # invocation carrying quoted arguments with spaces (ssh host 'cmd --flag x',
@@ -29,11 +29,10 @@ fi
 
 path=$(tmux display -p -t "$pane" '#{pane_current_path}' 2>/dev/null)
 
-# SSH mode pins a host for the whole session, so it wins over what this
-# particular pane happens to be running -- that is what makes the mode work
-# from a local pane. Without the mode, follow the pane itself.
+# The mode is the only thing that sends a new pane to the server. A pane that
+# happens to be ssh'd somewhere does not: with the mode off, Alt+c and the
+# splits are local, the way they were before any of this.
 ssh_cmd=$(tmux show-option -qv @ssh_mode_cmd)
-[ -n "$ssh_cmd" ] || ssh_cmd=$("$(dirname "$0")/ssh-target.sh" "$pane")
 
 if [ -z "$ssh_cmd" ]; then
   exec tmux "$@" -c "$path"
