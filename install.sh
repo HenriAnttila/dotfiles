@@ -26,6 +26,8 @@ ln -sf ~/dotfiles/tmux/scripts/git-branch.sh ~/.tmux/scripts/git-branch.sh
 ln -sf ~/dotfiles/tmux/scripts/location.sh ~/.tmux/scripts/location.sh
 # PR picker, "pull requests" in the Alt+o menu (needs gh + fzf, see dependencies.sh)
 ln -sf ~/dotfiles/tmux/scripts/pr-checkout.sh ~/.tmux/scripts/pr-checkout.sh
+# Repo picker, "clone repo" in the Alt+o menu: clones into the pane's directory
+ln -sf ~/dotfiles/tmux/scripts/repo-clone.sh ~/.tmux/scripts/repo-clone.sh
 # "claude" in the Alt+n / Alt+Shift+I menus: popup for the first prompt, then
 # opens the session with it (locally, or on the server while SSH mode is on)
 ln -sf ~/dotfiles/tmux/scripts/claude-open.sh ~/.tmux/scripts/claude-open.sh
