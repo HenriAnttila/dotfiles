@@ -24,7 +24,7 @@ mkdir -p ~/.tmux/scripts
 ln -sf ~/dotfiles/tmux/scripts/git-branch.sh ~/.tmux/scripts/git-branch.sh
 # status-right "where am I" segment: folder + branch, or SSH + host when remote
 ln -sf ~/dotfiles/tmux/scripts/location.sh ~/.tmux/scripts/location.sh
-# PR picker bound to Alt+p (needs gh + fzf, see dependencies.sh)
+# PR picker, "pull requests" in the Alt+o menu (needs gh + fzf, see dependencies.sh)
 ln -sf ~/dotfiles/tmux/scripts/pr-checkout.sh ~/.tmux/scripts/pr-checkout.sh
 # "claude" in the Alt+n / Alt+Shift+I menus: popup for the first prompt, then
 # opens the session with it (locally, or on the server while SSH mode is on)
