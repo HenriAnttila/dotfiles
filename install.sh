@@ -1,9 +1,10 @@
 #!/bin/bash
 
-# Symlink configs
-ln -sf ~/dotfiles/nvim ~/.config/nvim
-ln -sf ~/dotfiles/yazi ~/.config/yazi
-ln -sf ~/dotfiles/ghostty ~/.config/ghostty
+# Symlink configs. -n is required for directories: without it a re-run follows
+# the existing symlink and creates a self-referential link *inside* the target.
+ln -sfn ~/dotfiles/nvim ~/.config/nvim
+ln -sfn ~/dotfiles/yazi ~/.config/yazi
+ln -sfn ~/dotfiles/ghostty ~/.config/ghostty
 
 # lazygit (config path differs between macOS and Linux)
 if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -21,6 +22,21 @@ ln -sf ~/dotfiles/gh-dash/config.yml ~/.config/gh-dash/config.yml
 # tmux helper scripts (referenced from tmux.conf status-right)
 mkdir -p ~/.tmux/scripts
 ln -sf ~/dotfiles/tmux/scripts/git-branch.sh ~/.tmux/scripts/git-branch.sh
+# status-right "where am I" segment: folder + branch, or SSH + host when remote
+ln -sf ~/dotfiles/tmux/scripts/location.sh ~/.tmux/scripts/location.sh
+# PR picker bound to Alt+p (needs gh + fzf, see dependencies.sh)
+ln -sf ~/dotfiles/tmux/scripts/pr-checkout.sh ~/.tmux/scripts/pr-checkout.sh
+# SSH mode splits and windows: ssh-open.sh re-runs the pinned ssh command,
+# ssh-target.sh digs that command out of the process table (location.sh uses it
+# for the SSH segment in status-right)
+ln -sf ~/dotfiles/tmux/scripts/ssh-target.sh ~/.tmux/scripts/ssh-target.sh
+ln -sf ~/dotfiles/tmux/scripts/ssh-open.sh ~/.tmux/scripts/ssh-open.sh
+# SSH mode: the toggle, the remote program runner, and the script that builds
+# the sshmode key table from root plus tmux/sshmode.conf
+ln -sf ~/dotfiles/tmux/scripts/ssh-mode.sh ~/.tmux/scripts/ssh-mode.sh
+ln -sf ~/dotfiles/tmux/scripts/ssh-run.sh ~/.tmux/scripts/ssh-run.sh
+ln -sf ~/dotfiles/tmux/scripts/ssh-mode-table.sh ~/.tmux/scripts/ssh-mode-table.sh
+ln -sf ~/dotfiles/tmux/sshmode.conf ~/.tmux/sshmode.conf
 
 # tmux-window-name plugin needs libtmux. Its launcher checks bare `python`
 # (which may be anaconda/another interpreter), while the rename script uses
@@ -33,6 +49,26 @@ command -v python >/dev/null && python -m pip install libtmux 2>/dev/null || tru
 # Claude Code global instructions
 mkdir -p ~/.claude
 ln -sf ~/dotfiles/.claude/CLAUDE.md ~/.claude/CLAUDE.md
+
+# Claude Code personal skills — only skills written here, never downloaded ones.
+# Third-party skills are installed from a marketplace instead (see
+# enabledPlugins in ~/.claude/settings.json) so they stay versioned and
+# updatable via `claude plugin update`.
+#
+# Symlinked per-skill, not as a whole directory: ~/.claude/skills also holds
+# marketplace-installed skills, and a directory-level symlink would hide them.
+mkdir -p ~/.claude/skills
+find ~/.claude/skills -maxdepth 1 -type l ! -exec test -e {} \; -delete  # prune dead links
+for skill in ~/dotfiles/claude/skills/*/; do
+  ln -sfn "$skill" ~/.claude/skills/"$(basename "$skill")"
+done
+
+# zsh aliases. ~/.zshrc itself is not tracked (it holds machine-generated nvm,
+# conda, and bun bootstrap), so hook the tracked aliases in with a source line.
+ZSH_SOURCE_LINE='[ -f "$HOME/dotfiles/zsh/aliases.zsh" ] && source "$HOME/dotfiles/zsh/aliases.zsh"'
+if ! grep -qF 'dotfiles/zsh/aliases.zsh' ~/.zshrc 2>/dev/null; then
+  echo "$ZSH_SOURCE_LINE" >>~/.zshrc
+fi
 
 # Add other symlinks as needed
 # ln -sf ~/dotfiles/bashrc ~/.bashrc

@@ -21,40 +21,8 @@ return {
         desc = "Open floating terminal",
         mode = "n",
       },
-      {
-        "<leader>ac",
-        function()
-          local file = vim.fn.expand("%:p:h")
-          require("toggleterm.terminal").Terminal
-            :new({
-              cmd = "claude",
-              dir = file,
-              direction = "float",
-              close_on_exit = false,
-              id = 67,
-            })
-            :toggle()
-        end,
-        desc = "Open Claude at current directory",
-        mode = "n",
-      },
-      {
-        "<leader>af",
-        function()
-          local file = vim.fn.expand("%:p:h")
-          require("toggleterm.terminal").Terminal
-            :new({
-              cmd = "claude",
-              dir = file,
-              direction = "float",
-              close_on_exit = false,
-              id = 68,
-            })
-            :toggle()
-        end,
-        desc = "Open Claude Fine at current directory",
-        mode = "n",
-      },
+      -- <leader>ac / <leader>af now belong to claudecode.nvim (see
+      -- plugins/claudecode.lua). They opened plain `claude` floats here.
       {
         "<leader>rd",
         function()

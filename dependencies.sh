@@ -14,6 +14,7 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
       ripgrep \
       fd-find \
       fzf \
+      jq \
       python3 \
       python3-pip
 
@@ -61,6 +62,7 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
       base-devel \
       ripgrep \
       fzf \
+      jq \
       fd \
       python \
       python-pip \
@@ -82,6 +84,7 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
       ripgrep \
       fd-find \
       fzf \
+      jq \
       python3 \
       python3-pip
 
@@ -117,6 +120,7 @@ elif [[ "$OSTYPE" == "darwin"* ]]; then
     ripgrep \
     fd \
     fzf \
+    jq \
     lazygit \
     neovim \
     node \
