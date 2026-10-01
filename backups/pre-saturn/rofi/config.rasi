@@ -1,0 +1,18 @@
+configuration {
+    font: "JetBrainsMono Nerd Font 13";
+    show-icons: true;
+    icon-theme: "Papirus-Dark";
+    display-drun: "󰀻";
+    display-run: "";
+    display-window: "󱂬";
+    drun-display-format: "{name}";
+    hover-select: true;
+    me-select-entry: "";
+    me-accept-entry: "MousePrimary";
+}
+
+//@theme "~/.config/rofi/electric-nord.rasi"
+
+//@theme "/usr/share/rofi/themes/dmenu.rasi"
+
+@theme "/usr/share/rofi/themes/solarized.rasi"

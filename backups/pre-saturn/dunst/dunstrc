@@ -1,0 +1,103 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  Dunst Configuration - Electric Nord Theme
+#  A vibrant Nordic aesthetic with electric blue accents
+# ═══════════════════════════════════════════════════════════════════════════
+
+[global]
+    # Display
+    monitor = 0
+    follow = mouse
+
+    # Geometry
+    width = 360
+    height = 160
+    origin = top-right
+    offset = 14x14
+
+    # Progress bar
+    progress_bar = true
+    progress_bar_height = 12
+    progress_bar_frame_width = 1
+    progress_bar_min_width = 150
+    progress_bar_max_width = 320
+    highlight = "#00D4FF"
+
+    # Appearance
+    indicate_hidden = yes
+    shrink = no
+    transparency = 0
+    separator_height = 2
+    padding = 18
+    horizontal_padding = 18
+    text_icon_padding = 18
+    frame_width = 2
+    frame_color = "#00D4FF"
+    gap_size = 8
+    separator_color = frame
+    sort = yes
+    idle_threshold = 120
+
+    # Text
+    font = JetBrainsMono Nerd Font 11
+    line_height = 0
+    markup = full
+    format = "<b>%s</b>\n%b"
+    alignment = left
+    vertical_alignment = center
+    show_age_threshold = 60
+    ellipsize = middle
+    ignore_newline = no
+    stack_duplicates = true
+    hide_duplicate_count = false
+    show_indicators = yes
+
+    # Icons
+    icon_position = left
+    min_icon_size = 32
+    max_icon_size = 64
+    icon_path = /usr/share/icons/Papirus-Dark/48x48/status/:/usr/share/icons/Papirus-Dark/48x48/devices/:/usr/share/icons/Papirus-Dark/48x48/apps/
+
+    # History
+    sticky_history = yes
+    history_length = 20
+
+    # Misc
+    dmenu = /usr/bin/rofi -dmenu -p dunst
+    browser = /usr/bin/xdg-open
+    always_run_script = true
+    title = Dunst
+    class = Dunst
+    corner_radius = 14
+    ignore_dbusclose = false
+
+    # Wayland
+    layer = top
+    force_xwayland = false
+
+    # Mouse actions
+    mouse_left_click = close_current
+    mouse_middle_click = do_action, close_current
+    mouse_right_click = close_all
+
+[experimental]
+    per_monitor_dpi = false
+
+# ─── Urgency Levels ──────────────────────────────────────────────────────────
+
+[urgency_low]
+    background = "#2E3440"
+    foreground = "#ECEFF4"
+    frame_color = "#5EEAD4"
+    timeout = 5
+
+[urgency_normal]
+    background = "#2E3440"
+    foreground = "#ECEFF4"
+    frame_color = "#00D4FF"
+    timeout = 10
+
+[urgency_critical]
+    background = "#2E3440"
+    foreground = "#ECEFF4"
+    frame_color = "#FF6B8A"
+    timeout = 0
