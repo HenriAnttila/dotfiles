@@ -24,8 +24,13 @@ mkdir -p ~/.tmux/scripts
 ln -sf ~/dotfiles/tmux/scripts/git-branch.sh ~/.tmux/scripts/git-branch.sh
 # status-right "where am I" segment: folder + branch, or SSH + host when remote
 ln -sf ~/dotfiles/tmux/scripts/location.sh ~/.tmux/scripts/location.sh
-# PR picker bound to Alt+p (needs gh + fzf, see dependencies.sh)
+# PR picker, "pull requests" in the Alt+o menu (needs gh + fzf, see dependencies.sh)
 ln -sf ~/dotfiles/tmux/scripts/pr-checkout.sh ~/.tmux/scripts/pr-checkout.sh
+# Repo picker, "clone repo" in the Alt+o menu: clones into the pane's directory
+ln -sf ~/dotfiles/tmux/scripts/repo-clone.sh ~/.tmux/scripts/repo-clone.sh
+# "claude" in the Alt+n / Alt+Shift+I menus: popup for the first prompt, then
+# opens the session with it (locally, or on the server while SSH mode is on)
+ln -sf ~/dotfiles/tmux/scripts/claude-open.sh ~/.tmux/scripts/claude-open.sh
 # SSH mode splits and windows: ssh-open.sh re-runs the pinned ssh command,
 # ssh-target.sh digs that command out of the process table (location.sh uses it
 # for the SSH segment in status-right)
