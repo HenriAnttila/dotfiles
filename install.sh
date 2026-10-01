@@ -42,6 +42,16 @@ ln -sf ~/dotfiles/tmux/scripts/ssh-mode.sh ~/.tmux/scripts/ssh-mode.sh
 ln -sf ~/dotfiles/tmux/scripts/ssh-run.sh ~/.tmux/scripts/ssh-run.sh
 ln -sf ~/dotfiles/tmux/scripts/ssh-mode-table.sh ~/.tmux/scripts/ssh-mode-table.sh
 ln -sf ~/dotfiles/tmux/sshmode.conf ~/.tmux/sshmode.conf
+# Alt+p project picker: re-roots the current session at a chosen project
+ln -sf ~/dotfiles/tmux/scripts/project-root.sh ~/.tmux/scripts/project-root.sh
+# per-window memory segment in the status bar, plus the hook that refreshes it
+ln -sf ~/dotfiles/tmux/scripts/window-mem.sh ~/.tmux/scripts/window-mem.sh
+ln -sf ~/dotfiles/tmux/scripts/window-mem-refresh.sh ~/.tmux/scripts/window-mem-refresh.sh
+
+# tmux config itself, then tpm and the plugins tmux.conf declares with @plugin
+ln -sf ~/dotfiles/tmux.conf ~/.tmux.conf
+[ -d ~/.tmux/plugins/tpm ] || git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+~/.tmux/plugins/tpm/bin/install_plugins
 
 # tmux-window-name plugin needs libtmux. Its launcher checks bare `python`
 # (which may be anaconda/another interpreter), while the rename script uses
@@ -77,6 +87,5 @@ fi
 
 # Add other symlinks as needed
 # ln -sf ~/dotfiles/bashrc ~/.bashrc
-# ln -sf ~/dotfiles/tmux.conf ~/.tmux.conf
 
 echo "Dotfiles installed!"
