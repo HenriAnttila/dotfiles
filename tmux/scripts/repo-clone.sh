@@ -25,7 +25,7 @@ for tool in gh fzf jq; do
 	command -v "$tool" >/dev/null || die "$tool not found on PATH"
 done
 
-tmpdir=$(mktemp -d -t repo-picker) || die "could not create temp dir"
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/repo-picker.XXXXXX") || die "could not create temp dir"
 trap 'rm -rf "$tmpdir"' EXIT
 json="$tmpdir/repos.json"
 

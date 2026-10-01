@@ -9,7 +9,10 @@
 #
 # Run after the plugins load: vim-tmux-navigator binds Ctrl+hjkl in root, and
 # those have to come along too.
-tmp=$(mktemp -t sshmode) || exit 0
+# A full template with XXXXXX, not `-t sshmode`: the bare-prefix form is BSD
+# only, and GNU mktemp (Linux, WSL, MSYS2) rejects it. A silent failure here
+# leaves the sshmode table empty, so SSH mode unbinds every key but Alt+t.
+tmp=$(mktemp "${TMPDIR:-/tmp}/sshmode.XXXXXX") || exit 0
 tmux unbind-key -a -T sshmode 2>/dev/null
 tmux list-keys -T root | sed 's/^bind-key  */bind-key /; s/^bind-key -T root /bind-key -T sshmode /' > "$tmp"
 tmux source-file "$tmp"
