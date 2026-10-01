@@ -7,7 +7,6 @@
   "margin-left": 12,
   "margin-right": 12,
   "modules-left": [
-    "custom/reboot",
     "custom/power",
     "hyprland/workspaces"
   ],
@@ -36,12 +35,6 @@
     "on-click": "hyprlock",
     "tooltip": true,
     "tooltip-format": "锁屏"
-  },
-  "custom/reboot": {
-    "format": "<span size='12pt' color='#CEB37E'> 󰜉 </span>",
-    "on-click": "systemctl reboot",
-    "tooltip": true,
-    "tooltip-format": "重启"
   },
   "custom/power": {
     "format": "<span size='12pt' color='#C47164'> 󰐥 </span>",
