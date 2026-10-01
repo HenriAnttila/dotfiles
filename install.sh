@@ -19,34 +19,15 @@ ln -sf ~/dotfiles/lazygit.yml "$LAZYGIT_DIR/config.yml"
 mkdir -p ~/.config/gh-dash
 ln -sf ~/dotfiles/gh-dash/config.yml ~/.config/gh-dash/config.yml
 
-# tmux helper scripts (referenced from tmux.conf status-right)
+# tmux helper scripts, called from tmux.conf as ~/.tmux/scripts/<name>.sh.
+# Every script in tmux/scripts is linked, so a new one needs no edit here.
 mkdir -p ~/.tmux/scripts
-ln -sf ~/dotfiles/tmux/scripts/git-branch.sh ~/.tmux/scripts/git-branch.sh
-# status-right "where am I" segment: folder + branch, or SSH + host when remote
-ln -sf ~/dotfiles/tmux/scripts/location.sh ~/.tmux/scripts/location.sh
-# PR picker, "pull requests" in the Alt+o menu (needs gh + fzf, see dependencies.sh)
-ln -sf ~/dotfiles/tmux/scripts/pr-checkout.sh ~/.tmux/scripts/pr-checkout.sh
-# Repo picker, "clone repo" in the Alt+o menu: clones into the pane's directory
-ln -sf ~/dotfiles/tmux/scripts/repo-clone.sh ~/.tmux/scripts/repo-clone.sh
-# "claude" in the Alt+n / Alt+Shift+I menus: popup for the first prompt, then
-# opens the session with it (locally, or on the server while SSH mode is on)
-ln -sf ~/dotfiles/tmux/scripts/claude-open.sh ~/.tmux/scripts/claude-open.sh
-# SSH mode splits and windows: ssh-open.sh re-runs the pinned ssh command,
-# ssh-target.sh digs that command out of the process table (location.sh uses it
-# for the SSH segment in status-right)
-ln -sf ~/dotfiles/tmux/scripts/ssh-target.sh ~/.tmux/scripts/ssh-target.sh
-ln -sf ~/dotfiles/tmux/scripts/ssh-open.sh ~/.tmux/scripts/ssh-open.sh
-# SSH mode: the toggle, the remote program runner, and the script that builds
-# the sshmode key table from root plus tmux/sshmode.conf
-ln -sf ~/dotfiles/tmux/scripts/ssh-mode.sh ~/.tmux/scripts/ssh-mode.sh
-ln -sf ~/dotfiles/tmux/scripts/ssh-run.sh ~/.tmux/scripts/ssh-run.sh
-ln -sf ~/dotfiles/tmux/scripts/ssh-mode-table.sh ~/.tmux/scripts/ssh-mode-table.sh
+find ~/.tmux/scripts -maxdepth 1 -type l ! -exec test -e {} \; -delete  # prune dead links
+for script in ~/dotfiles/tmux/scripts/*.sh; do
+  ln -sf "$script" ~/.tmux/scripts/"$(basename "$script")"
+done
+# SSH mode key table bindings, read by ssh-mode-table.sh
 ln -sf ~/dotfiles/tmux/sshmode.conf ~/.tmux/sshmode.conf
-# Alt+p project picker: re-roots the current session at a chosen project
-ln -sf ~/dotfiles/tmux/scripts/project-root.sh ~/.tmux/scripts/project-root.sh
-# per-window memory segment in the status bar, plus the hook that refreshes it
-ln -sf ~/dotfiles/tmux/scripts/window-mem.sh ~/.tmux/scripts/window-mem.sh
-ln -sf ~/dotfiles/tmux/scripts/window-mem-refresh.sh ~/.tmux/scripts/window-mem-refresh.sh
 
 # tmux config itself, then tpm and the plugins tmux.conf declares with @plugin
 ln -sf ~/dotfiles/tmux.conf ~/.tmux.conf
