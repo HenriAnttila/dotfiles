@@ -17,6 +17,7 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
       jq \
       python3 \
       python3-pip \
+      golang-go \
       git-crypt
 
     # Install Node.js (via NodeSource)
@@ -72,6 +73,7 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
       npm \
       lazygit \
       github-cli \
+      go \
       git-crypt
 
     echo "✓ Dependencies installed!"
@@ -89,6 +91,7 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
       jq \
       python3 \
       python3-pip \
+      golang \
       git-crypt
 
     # Install Node.js
@@ -129,6 +132,7 @@ elif [[ "$OSTYPE" == "darwin"* ]]; then
     node \
     python \
     gh \
+    go \
     git-crypt
   echo "✓ Dependencies installed!"
 fi

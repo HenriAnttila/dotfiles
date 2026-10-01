@@ -34,6 +34,15 @@ ln -sf ~/dotfiles/tmux.conf ~/.tmux.conf
 [ -d ~/.tmux/plugins/tpm ] || git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
 ~/.tmux/plugins/tpm/bin/install_plugins
 
+# lazyprojects, the project TUI behind tmux's Alt+p. It lives in its own repo;
+# this only installs the binary. GOBIN puts it in ~/.local/bin rather than
+# ~/go/bin, which is not on the PATH tmux runs the binding with.
+if command -v go >/dev/null; then
+  GOBIN="$HOME/.local/bin" go install github.com/HenriAnttila/lazyprojects@latest
+else
+  echo "go not found: skipping lazyprojects (run dependencies.sh, then re-run install.sh)"
+fi
+
 # ssh config (keys are not tracked). ssh/config is git-crypt encrypted, so only
 # link it once the clone is unlocked: a locked checkout holds ciphertext, which
 # would break every ssh call. An existing non-symlink config is kept as .bak.
