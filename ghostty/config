@@ -17,8 +17,8 @@ macos-window-shadow = false
 # picker <A-w> cycle_win), including Caps Lock remapped to Option (which macOS
 # sends as Right Option); left Option still types special chars like Ω.
 macos-option-as-alt = right
-window-padding-x = 0
-window-padding-y = 0
+window-padding-x = 6
+window-padding-y = 6
 # Spread the leftover space (window height not evenly divisible by cell height)
 # across all edges instead of dumping it as a gap on the bottom/right.
 window-padding-balance = true
