@@ -3,28 +3,29 @@
    Clean, luminous, sharp. Cyan glow segmented readout.
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* Saturn palette (from wallhaven-7jeozo.jpg); Electric Nord variable names kept */
 /* ─── Colors ──────────────────────────────────────────────────────────────── */
-@define-color polar0 #2E3440;
-@define-color polar1 #3B4252;
-@define-color polar2 #434C5E;
-@define-color polar3 #4C566A;
+@define-color polar0 #110708;
+@define-color polar1 #211617;
+@define-color polar2 #3D241C;
+@define-color polar3 #644C3B;
 
-@define-color snow0 #D8DEE9;
-@define-color snow1 #E5E9F0;
-@define-color snow2 #ECEFF4;
+@define-color snow0 #ACC1BB;
+@define-color snow1 #D4E1DB;
+@define-color snow2 #E9EFE7;
 
-@define-color void #000000;
-@define-color electric1 #00FAFF;
-@define-color electric2 #00B4FF;
-@define-color electric3 #00FFE1;
-@define-color frost #88C0FC;
-@define-color evil #F10042;
+@define-color void #110708;
+@define-color electric1 #83B9B0;
+@define-color electric2 #83A3B9;
+@define-color electric3 #A0BAB7;
+@define-color frost #83A3B9;
+@define-color evil #C47164;
 
-@define-color aurora_purple #C792EA;
-@define-color aurora_red #FF6B8A;
-@define-color aurora_orange #FFAB70;
-@define-color aurora_yellow #FFE066;
-@define-color aurora_green #95E6A0;
+@define-color aurora_purple #BA97AE;
+@define-color aurora_red #C47164;
+@define-color aurora_orange #CC8F66;
+@define-color aurora_yellow #CEB37E;
+@define-color aurora_green #9BB18B;
 
 /* ─── Global ──────────────────────────────────────────────────────────────── */
 * {

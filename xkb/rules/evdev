@@ -1,0 +1,5 @@
+// User xkb rules: adds custom options on top of the system evdev rules.
+! option = symbols
+  custom:caps_alt = +custom(caps_alt)
+
+! include %S/evdev

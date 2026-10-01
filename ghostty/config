@@ -50,39 +50,39 @@ font-size = 14
 # Alacritty font.offset y = 2 (extra line spacing); closest Ghostty knob:
 adjust-cell-height = 2
 
-# ─── EVILWARE palette ────────────────────────────────────────────────────────
-background = 000000
-foreground = FFFFFF
+# ─── SATURN palette (from wallhaven-7jeozo.jpg) ────────────────────────────────────────────────────────
+background = 110708
+foreground = D4E1DB
 
 # cursor (alacritty [colors.cursor])
-cursor-color = F10042
-cursor-text = 000000
+cursor-color = CC8F66
+cursor-text = 110708
 
 # selection (alacritty [colors.selection])
-selection-foreground = FFFFFF
-selection-background = 072025
+selection-foreground = E9EFE7
+selection-background = 3D241C
 
 # normal colors 0-7 (alacritty [colors.normal])
-palette = 0=#000000
-palette = 1=#F10042
-palette = 2=#00FAFF
-palette = 3=#F10042
-palette = 4=#00FAFF
-palette = 5=#F10042
-palette = 6=#00FAFF
-palette = 7=#FF0059
+palette = 0=#211617
+palette = 1=#C47164
+palette = 2=#9BB18B
+palette = 3=#CEB37E
+palette = 4=#83A3B9
+palette = 5=#BA97AE
+palette = 6=#83B9B0
+palette = 7=#ACC1BB
 # bright colors 8-15 (alacritty [colors.bright])
-palette = 8=#1A1A1A
-palette = 9=#F10042
-palette = 10=#00FFE1
-palette = 11=#F10042
-palette = 12=#00FFE1
-palette = 13=#F10042
-palette = 14=#00FFE1
-palette = 15=#FFFFFF
+palette = 8=#778483
+palette = 9=#D58C81
+palette = 10=#AFC69F
+palette = 11=#DDC698
+palette = 12=#99B7CC
+palette = 13=#CDACC2
+palette = 14=#99CCC3
+palette = 15=#E9EFE7
 # indexed highlights (alacritty [[colors.indexed_colors]])
-palette = 16=#F10042
-palette = 17=#00FAFF
+palette = 16=#CC8F66
+palette = 17=#83B9B0
 # Note: Ghostty has no direct equivalent for alacritty's dim_foreground,
 # bright_foreground, [colors.dim], vi_mode_cursor, search, hints, or footer_bar.
 

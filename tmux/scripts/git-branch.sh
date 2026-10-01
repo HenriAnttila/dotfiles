@@ -7,5 +7,5 @@ dir="$1"
 branch=$(cd "$dir" 2>/dev/null && git rev-parse --abbrev-ref HEAD 2>/dev/null)
 accent="$2"
 [ -n "$accent" ] || accent=$(tmux show-option -gqv @accent)
-[ -z "$accent" ] && accent="#1688f0"
-[ -n "$branch" ] && printf '#[fg=#575653]│ #[fg='"$accent"'] #[fg=#cecdc3]%s ' "$branch"
+[ -z "$accent" ] && accent="#83B9B0"
+[ -n "$branch" ] && printf '#[fg=#525350]│ #[fg='"$accent"'] #[fg=#D4E1DB]%s ' "$branch"

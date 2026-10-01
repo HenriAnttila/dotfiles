@@ -1,0 +1,7 @@
+// Caps Lock as an additional Alt, so it is the tmux/nvim Meta modifier on
+// Linux the same way it is on macOS (where Caps is remapped to Right Option).
+partial modifier_keys
+xkb_symbols "caps_alt" {
+    key <CAPS> { [ Alt_L ], type[group1] = "ONE_LEVEL" };
+    modifier_map Mod1 { <CAPS> };
+};
