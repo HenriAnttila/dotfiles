@@ -34,6 +34,17 @@ ln -sf ~/dotfiles/tmux.conf ~/.tmux.conf
 [ -d ~/.tmux/plugins/tpm ] || git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
 ~/.tmux/plugins/tpm/bin/install_plugins
 
+# ssh config (keys are not tracked). ssh/config is git-crypt encrypted, so only
+# link it once the clone is unlocked: a locked checkout holds ciphertext, which
+# would break every ssh call. An existing non-symlink config is kept as .bak.
+mkdir -p ~/.ssh/cm && chmod 700 ~/.ssh ~/.ssh/cm  # cm: ControlPath sockets
+if head -c 9 ~/dotfiles/ssh/config | grep -q GITCRYPT; then
+  echo "ssh/config is still encrypted: run 'git-crypt unlock <key>' and re-run install.sh"
+else
+  [ -f ~/.ssh/config ] && [ ! -L ~/.ssh/config ] && mv ~/.ssh/config ~/.ssh/config.bak
+  ln -sf ~/dotfiles/ssh/config ~/.ssh/config
+fi
+
 # tmux-window-name plugin needs libtmux. Its launcher checks bare `python`
 # (which may be anaconda/another interpreter), while the rename script uses
 # `python3` via env. Install into both so the check and the script both pass.

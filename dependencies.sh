@@ -16,7 +16,8 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
       fzf \
       jq \
       python3 \
-      python3-pip
+      python3-pip \
+      git-crypt
 
     # Install Node.js (via NodeSource)
     echo "Installing Node.js..."
@@ -70,7 +71,8 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
       nodejs \
       npm \
       lazygit \
-      github-cli
+      github-cli \
+      git-crypt
 
     echo "✓ Dependencies installed!"
 
@@ -86,7 +88,8 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
       fzf \
       jq \
       python3 \
-      python3-pip
+      python3-pip \
+      git-crypt
 
     # Install Node.js
     echo "Installing Node.js..."
@@ -125,7 +128,8 @@ elif [[ "$OSTYPE" == "darwin"* ]]; then
     neovim \
     node \
     python \
-    gh
+    gh \
+    git-crypt
   echo "✓ Dependencies installed!"
 fi
 
@@ -146,6 +150,7 @@ python3 --version && echo "✓ Python installed" || echo "⚠ Python not found"
 lazygit --version 2>/dev/null && echo "✓ lazygit installed" || echo "⚠ lazygit not found"
 gh --version 2>/dev/null | head -n 1 && echo "✓ gh installed" || echo "⚠ gh not found"
 gh dash --version 2>/dev/null | tail -n 1 && echo "✓ gh-dash installed" || echo "⚠ gh-dash not found"
+git-crypt --version 2>/dev/null && echo "✓ git-crypt installed" || echo "⚠ git-crypt not found"
 echo ""
 echo "Run ./install.sh to set up your config!"
 
