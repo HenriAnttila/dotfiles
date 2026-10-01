@@ -45,7 +45,7 @@
   },
   "custom/power": {
     "format": "<span size='12pt' color='#C47164'> 󰐥 </span>",
-    "on-click": "systemctl poweroff",
+    "on-click": "~/.config/waybar/power-menu.sh",
     "tooltip": true,
     "tooltip-format": "关机"
   },
