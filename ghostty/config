@@ -109,3 +109,9 @@ keybind = ctrl+shift+c=copy_to_clipboard
 keybind = ctrl+plus=increase_font_size:1
 keybind = ctrl+minus=decrease_font_size:1
 keybind = ctrl+zero=reset_font_size
+
+# ─── Theme ───────────────────────────────────────────────────────────────────
+# Colors from the tmux theme picker (Alt+o t): the current nvim colorscheme,
+# written by tmux/scripts/theme-apply.sh. Overrides the SATURN palette above,
+# which stays as the fallback. `?` = fine if it doesn't exist yet.
+config-file = ?theme.generated

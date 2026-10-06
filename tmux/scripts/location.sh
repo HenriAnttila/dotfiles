@@ -22,12 +22,12 @@ here=$(dirname "$0")
 
 host=$("$here/ssh-target.sh" --host "$pane" "$tty")
 if [ -n "$host" ]; then
-  printf '#[fg=%s]SSH #[fg=#D4E1DB]%s ' "$accent" "$host"
+  printf '#[fg=%s]SSH #[fg=default]%s ' "$accent" "$host"
   exit 0
 fi
 
 [ -n "$dir" ] || dir=$(tmux display -p -t "$pane" '#{pane_current_path}' 2>/dev/null)
 [ -n "$dir" ] || exit 0
 [ "$dir" = "$HOME" ] && name="~" || name=$(basename "$dir")
-printf '#[fg=%s] #[fg=#D4E1DB]%s ' "$accent" "$name"
+printf '#[fg=%s] #[fg=default]%s ' "$accent" "$name"
 "$here/git-branch.sh" "$dir" "$accent"
