@@ -139,9 +139,11 @@ apply_ghostty_config() {
 apply_nvim() {
   local sock
   printf '%s\n' "$name" > "$last"
-  find "${TMPDIR:-/tmp/}nvim.$USER" -type s 2>/dev/null | while read -r sock; do
+  # Not `find | while`: the loop would run in a subshell, `wait` here would
+  # not see its jobs, and the picker's popup closing would kill them mid-call.
+  while read -r sock; do
     nvim --server "$sock" --remote-expr "execute('colorscheme $name')" >/dev/null 2>&1 &
-  done
+  done < <(find "${TMPDIR:-/tmp/}nvim.$USER" -type s 2>/dev/null)
   wait
 }
 
