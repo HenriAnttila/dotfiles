@@ -11,7 +11,7 @@ fullscreen = non-native
 # `true` = same fill-everything non-native mode, so re-entering fullscreen still
 # fills the notch area instead of falling back to native (which blacks it out).
 macos-non-native-fullscreen = true
-background-opacity = 1
+background-opacity = 0.96
 macos-window-shadow = false
 # Right Option = Alt/Meta so Neovim/tmux M-/Alt- bindings work (e.g. snacks
 # picker <A-w> cycle_win), including Caps Lock remapped to Option (which macOS
@@ -50,39 +50,39 @@ font-size = 14
 # Alacritty font.offset y = 2 (extra line spacing); closest Ghostty knob:
 adjust-cell-height = 2
 
-# ─── SATURN palette (from wallhaven-7jeozo.jpg) ────────────────────────────────────────────────────────
-background = 110708
-foreground = D4E1DB
+# ─── ABSTRACT palette (from abstract-background.jpg) ────────────────────────────────────────────────────────
+background = 080418
+foreground = CECBE5
 
 # cursor (alacritty [colors.cursor])
-cursor-color = CC8F66
-cursor-text = 110708
+cursor-color = E08C9D
+cursor-text = 080418
 
 # selection (alacritty [colors.selection])
-selection-foreground = E9EFE7
-selection-background = 3D241C
+selection-foreground = EBE9F4
+selection-background = 292C60
 
 # normal colors 0-7 (alacritty [colors.normal])
-palette = 0=#211617
+palette = 0=#1C1C40
 palette = 1=#C47164
-palette = 2=#9BB18B
+palette = 2=#87C9B3
 palette = 3=#CEB37E
-palette = 4=#83A3B9
-palette = 5=#BA97AE
-palette = 6=#83B9B0
-palette = 7=#ACC1BB
+palette = 4=#82ADF6
+palette = 5=#B597C9
+palette = 6=#67ADFB
+palette = 7=#AEA9D3
 # bright colors 8-15 (alacritty [colors.bright])
-palette = 8=#778483
+palette = 8=#3A407C
 palette = 9=#D58C81
-palette = 10=#AFC69F
+palette = 10=#A5D6C6
 palette = 11=#DDC698
-palette = 12=#99B7CC
-palette = 13=#CDACC2
-palette = 14=#99CCC3
-palette = 15=#E9EFE7
+palette = 12=#A1C1F8
+palette = 13=#CBB6D9
+palette = 14=#95C6FC
+palette = 15=#EBE9F4
 # indexed highlights (alacritty [[colors.indexed_colors]])
-palette = 16=#CC8F66
-palette = 17=#83B9B0
+palette = 16=#E08C9D
+palette = 17=#67ADFB
 # Note: Ghostty has no direct equivalent for alacritty's dim_foreground,
 # bright_foreground, [colors.dim], vi_mode_cursor, search, hints, or footer_bar.
 
@@ -106,6 +106,10 @@ term = xterm-256color
 keybind = shift+enter=text:\x1b\r
 keybind = ctrl+shift+v=paste_from_clipboard
 keybind = ctrl+shift+c=copy_to_clipboard
+# Named keys (minus, zero, equal) match the physical US-layout position; on a
+# Nordic layout the `+` key sits at US `minus`, so ctrl+minus fired on Ctrl++.
+# Unbind the physical one and bind by the character the layout actually types.
+keybind = ctrl+minus=unbind
 keybind = ctrl+plus=increase_font_size:1
-keybind = ctrl+minus=decrease_font_size:1
-keybind = ctrl+zero=reset_font_size
+keybind = ctrl+-=decrease_font_size:1
+keybind = ctrl+0=reset_font_size
