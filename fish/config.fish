@@ -17,5 +17,6 @@ function fish_prompt
     set -l dir (path basename $PWD)
     test "$PWD" = "$HOME"; and set dir '~'
 
-    echo -n -s (set_color $fish_color_cwd) $dir $normal ' ' $prompt_status '> '
+    # 2-space lead-in lines the prompt up with the session name in the tmux bar
+    echo -n -s '  ' (set_color $fish_color_cwd) $dir $normal ' ' $prompt_status '> '
 end
