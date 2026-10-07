@@ -15,6 +15,11 @@ fi
 mkdir -p "$LAZYGIT_DIR"
 ln -sf ~/dotfiles/lazygit.yml "$LAZYGIT_DIR/config.yml"
 
+# fish config. Linked as a file, not the directory: ~/.config/fish also holds
+# machine-local state (fish_variables, generated completions).
+mkdir -p ~/.config/fish
+ln -sf ~/dotfiles/fish/config.fish ~/.config/fish/config.fish
+
 # gh-dash (GitHub CLI dashboard) config
 mkdir -p ~/.config/gh-dash
 ln -sf ~/dotfiles/gh-dash/config.yml ~/.config/gh-dash/config.yml
