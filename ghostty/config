@@ -113,3 +113,7 @@ keybind = ctrl+minus=unbind
 keybind = ctrl+plus=increase_font_size:1
 keybind = ctrl+-=decrease_font_size:1
 keybind = ctrl+0=reset_font_size
+
+# ─── Shell ───────────────────────────────────────────────────────────────────
+# fish: grey history-based autosuggestions out of the box
+command = /usr/bin/fish
