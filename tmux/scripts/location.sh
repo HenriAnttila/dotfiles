@@ -28,6 +28,31 @@ fi
 
 [ -n "$dir" ] || dir=$(tmux display -p -t "$pane" '#{pane_current_path}' 2>/dev/null)
 [ -n "$dir" ] || exit 0
-[ "$dir" = "$HOME" ] && name="~" || name=$(basename "$dir")
+# Folder name, plus as many parent levels as it takes to be unique within the
+# git repo: "the_project", but "log_output/manifests" when the repo has several
+# "manifests". Folders come from git's file list (tracked + untracked, minus
+# ignored), so node_modules and friends never count as a clash. Outside a repo
+# it is just the folder name.
+root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null)
+if [ "$dir" = "$HOME" ]; then
+  name="~"
+elif [ -z "$root" ] || [ "$dir" = "$root" ]; then
+  name=$(basename "$dir")
+else
+  name=$({ git -C "$root" ls-files; git -C "$root" ls-files --others --exclude-standard; } |
+    awk -v rel="${dir#"$root"/}" '
+      { n = split($0, p, "/"); d = ""
+        for (i = 1; i < n; i++) { d = d (i > 1 ? "/" : "") p[i]; dirs[d] = 1 } }
+      END {
+        m = split(rel, c, "/")
+        for (k = 1; k <= m; k++) {
+          suf = c[m]; for (i = m - 1; i > m - k; i--) suf = c[i] "/" suf
+          hits = 0
+          for (d in dirs) if (d == suf || substr(d, length(d) - length(suf)) == "/" suf) hits++
+          if (hits <= 1) break
+        }
+        print suf
+      }')
+fi
 printf '#[fg=%s] #[fg=#CECBE5]%s ' "$accent" "$name"
 "$here/git-branch.sh" "$dir" "$accent"
