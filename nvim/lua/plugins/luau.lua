@@ -1,17 +1,36 @@
 -- Roblox / Luau support via luau-lsp.nvim.
 -- Tools (rojo, wally, selene, stylua) are pinned per-project with rokit.
 
+---@param source string|integer path or buffer
+local function rojo_root(source)
+  return vim.fs.root(source, function(name)
+    return name:match("%.project%.json$") ~= nil
+  end)
+end
+
 -- Treat .lua files inside a Rojo project as Luau so luau-lsp attaches
 -- instead of lua_ls.
 vim.filetype.add({
   extension = {
     lua = function(path)
-      local root = vim.fs.root(path, function(name)
-        return name:match("%.project%.json$") ~= nil
-      end)
-      return root and "luau" or "lua"
+      return rojo_root(path) and "luau" or "lua"
     end,
   },
+})
+
+-- luau-lsp.nvim finds the project file, writes sourcemap.json and runs rojo (a rokit
+-- shim that only works inside the project) all relative to the cwd. Move the tab into
+-- the Rojo project first, so it works however nvim was started. Registered before
+-- lazy.nvim's ft handler, so it runs before the plugin loads.
+vim.api.nvim_create_autocmd("FileType", {
+  group = vim.api.nvim_create_augroup("luau-rojo-root", {}),
+  pattern = "luau",
+  callback = function(args)
+    local root = rojo_root(args.buf)
+    if root and vim.uv.cwd() ~= root then
+      vim.cmd.tcd(root)
+    end
+  end,
 })
 
 return {
