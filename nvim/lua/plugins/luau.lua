@@ -48,4 +48,27 @@ return {
     "nvim-treesitter/nvim-treesitter",
     opts = { ensure_installed = { "luau" } },
   },
+  {
+    -- selene alongside luau-lsp: it catches things the type checker lets through.
+    -- Uses the project's rokit-pinned selene, so it's not installed through mason.
+    "mfussenegger/nvim-lint",
+    opts = {
+      linters_by_ft = { luau = { "selene" } },
+      linters = {
+        selene = {
+          -- only in projects that configure selene. Also runs selene from that project:
+          -- rokit's shim picks the pinned version from the cwd's rokit.toml and fails
+          -- anywhere else, which nvim-lint would swallow silently.
+          condition = function(ctx)
+            local config = vim.fs.find("selene.toml", { path = ctx.filename, upward = true })[1]
+            if not config then
+              return false
+            end
+            require("lint").linters.selene.cwd = vim.fs.dirname(config)
+            return true
+          end,
+        },
+      },
+    },
+  },
 }
