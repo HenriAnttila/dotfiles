@@ -25,7 +25,7 @@ done
 
 git rev-parse --git-dir >/dev/null 2>&1 || die "not a git repo: $PWD"
 
-tmpdir=$(mktemp -d -t pr-picker) || die "could not create temp dir"
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/pr-picker.XXXXXX") || die "could not create temp dir"
 trap 'rm -rf "$tmpdir"' EXIT
 json="$tmpdir/prs.json"
 

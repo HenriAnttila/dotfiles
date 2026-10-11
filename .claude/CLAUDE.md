@@ -24,3 +24,5 @@ fixes, applying a pattern I've already chosen — just do.
 - Create commits after completing each logical unit of work.
 - Do not push to the remote repository unless asked.
 - Use conventional commit messages (e.g. "feat:", "fix:", "refactor:").
+- NEVER add "Co-Authored-By: Claude" or any other Claude/AI attribution to
+  commits or PRs. No trailers, no "Generated with Claude Code".

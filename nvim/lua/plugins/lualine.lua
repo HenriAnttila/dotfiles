@@ -28,11 +28,11 @@ return {
       table.remove(s.lualine_c, 1)
     end
 
-    -- Show the Harpoon list in the statusline so pinned files are always
-    -- visible instead of hidden behind <leader>1..9. Next.js app-router means
+    -- Show the Arrow list in the statusline so pinned files are always
+    -- visible instead of hidden behind the , menu. Next.js app-router means
     -- every file is page.js/layout.js/route.js, so the bare filename is
     -- useless — show "parentdir/filename" to actually tell them apart.
-    vim.api.nvim_set_hl(0, "HarpoonStatusActive", { link = "DiffText", default = true })
+    vim.api.nvim_set_hl(0, "ArrowStatusActive", { link = "DiffText", default = true })
 
     -- Next.js app-router convention files carry no info in their name — the
     -- parent folder is the route. For those, show just the folder.
@@ -60,7 +60,7 @@ return {
     -- Build a contextual label: for convention files, walk up to the nearest
     -- real folder (skipping app/src and [dynamic]/(group) segments). Fall back
     -- to a bracket-stripped segment + the file's role, then to the role alone.
-    local function harpoon_label(path)
+    local function arrow_label(path)
       local parts = vim.split(path, "/", { plain = true })
       local n = #parts
       local file = parts[n] or path
@@ -94,22 +94,23 @@ return {
       return file
     end
 
-    local function harpoon_component()
-      local ok, harpoon = pcall(require, "harpoon")
+    local function arrow_component()
+      local ok, statusline = pcall(require, "arrow.statusline")
       if not ok then
         return ""
       end
-      local items = harpoon:list().items or {}
+      local items = vim.g.arrow_filenames or {}
       if #items == 0 then
         return ""
       end
-      local cur = vim.fn.expand("%:.")
+      local cur = statusline.is_on_arrow_file()
       local out = {}
-      for i, it in ipairs(items) do
-        if it.value and it.value ~= "" then
-          local label = i .. " " .. harpoon_label(it.value)
-          if it.value == cur then
-            label = "%#HarpoonStatusActive#" .. label .. "%*"
+      for i, value in ipairs(items) do
+        if value ~= "" then
+          -- arrow's own index key (1-9, then letters), i.e. what you press after ,
+          local label = statusline.text_for_statusline(nil, i) .. " " .. arrow_label(value)
+          if i == cur then
+            label = "%#ArrowStatusActive#" .. label .. "%*"
           end
           out[#out + 1] = label
         end
@@ -117,6 +118,6 @@ return {
       return table.concat(out, "  ")
     end
 
-    table.insert(s.lualine_c, { harpoon_component })
+    table.insert(s.lualine_c, { arrow_component })
   end,
 }
