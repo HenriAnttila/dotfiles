@@ -399,7 +399,24 @@ export function buildGraph(root: string, sourcemapFile = join(root, "sourcemap.j
   return { nodes, edges: [...edges.values()], files, unresolved };
 }
 
-if (import.meta.main) {
+// `--json` prints the graph as the page gets it, for other tools (nvim's
+// codegraph view): built from a sourcemap Rojo writes just now, with the
+// sentence explain.ts wrote for each script that has no header comment.
+if (import.meta.main && process.argv.includes("--json")) {
+  const root = process.argv[2] ?? process.cwd();
+  const { liveGraph } = await import("./structure.ts");
+  const graph = liveGraph(root);
+  try {
+    const { Repo } = await import("./git.ts");
+    const repo = new Repo(root);
+    const purposes = JSON.parse(readFileSync(join(repo.gitDir, "codegraph", "purposes.json"), "utf8"));
+    for (const n of graph.nodes) {
+      const p = purposes[n.id];
+      if (!n.doc && n.hash && p?.hash === n.hash) n.purpose = p.text;
+    }
+  } catch {}
+  console.log(JSON.stringify(graph));
+} else if (import.meta.main) {
   const started = performance.now();
   const graph = buildGraph(process.argv[2] ?? process.cwd());
   const count = (kind: string) => graph.edges.filter((e) => e.kind === kind).length;

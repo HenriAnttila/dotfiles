@@ -32,6 +32,15 @@ vim.keymap.set("n", "<leader>o", function()
   vim.cmd("startinsert")
 end, { desc = "Insert line with padding" })
 
+-- Code graph: the module you're on, what uses it and what it uses, walked
+-- link by link (lua/util/codegraph.lua). Only in Rojo projects.
+vim.keymap.set("n", "<leader>cg", function()
+  require("util.codegraph").open()
+end, { desc = "Code Graph (module)" })
+vim.api.nvim_create_user_command("CodeGraph", function()
+  require("util.codegraph").open()
+end, { desc = "Code graph of the current module" })
+
 -- Split right with <leader>i (I = vertical divider), mirroring tmux Alt+i.
 -- Keeps LazyVim's <leader>- (split below) and <leader>| working too.
 vim.keymap.set("n", "<leader>i", "<C-W>v", { desc = "Split Window Right", remap = true })
