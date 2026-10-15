@@ -42,6 +42,7 @@ const state = {
   sessions: [],
   sessionId: null,
   trailOpen: false,
+  focus: false,
   links: "selected",
 };
 
@@ -94,6 +95,15 @@ function styles() {
     ...STATUSES.map((s) => ({ selector: `node.${s}:childless`, style: { "background-color": status[s], "background-opacity": 0.22 } })),
     { selector: "node.trail-read", style: { "underlay-color": c.accent, "underlay-opacity": 0.24, "underlay-padding": 4, opacity: 1 } },
     { selector: "node.trail-edit", style: { "underlay-color": c.accent, "underlay-opacity": 0.38, "underlay-padding": 6, opacity: 1 } },
+    { selector: "node.off", style: { display: "none" } },
+    {
+      selector: "node.ghost",
+      style: { "background-opacity": 0, "border-width": 0, "text-opacity": 0, "underlay-opacity": 0, events: "no" },
+    },
+    {
+      selector: "node.focus",
+      style: { "font-size": 15, "text-wrap": "wrap", "text-max-width": 600, "line-height": 1.35, width: "data(fw)", height: 48, opacity: 1 },
+    },
     { selector: "node.match", style: { "underlay-color": c.accent, "underlay-opacity": 0.3, "underlay-padding": 4, opacity: 1 } },
     { selector: "node.neighbor", style: { "underlay-color": c.accent, "underlay-opacity": 0.18, "underlay-padding": 3, opacity: 1 } },
     { selector: "node:selected", style: { "underlay-color": c.accent, "underlay-opacity": 0.45, "underlay-padding": 5, opacity: 1 } },
@@ -151,6 +161,7 @@ const leaves = () => cy.nodes(":childless");
 const LAYOUT_VERSION = 4;
 
 const savePositions = debounce(() => {
+  if (state.focus) return;
   const positions = {};
   leaves().forEach((n) => {
     positions[n.id()] = n.position();
@@ -255,6 +266,7 @@ function packLayout() {
 function relayout() {
   const positions = packLayout();
   leaves().positions((n) => positions[n.id()]);
+  scheduleBoxes();
 }
 
 function place(saved) {
@@ -273,6 +285,7 @@ function place(saved) {
 const READABLE_ZOOM = 0.8;
 
 function focusChange(animate = true) {
+  if (state.focus) return;
   cy.fit(undefined, 30);
   if (cy.zoom() >= READABLE_ZOOM) return;
   const changed = cy.nodes(".A, .M, .D, .R");
@@ -347,6 +360,7 @@ function applyChange() {
     }
     if (touched) leaves().not(".A, .M, .D, .R").addClass("dim");
   });
+  if (state.focus) applyFocus(false);
   showLinks();
 }
 
@@ -466,7 +480,8 @@ function showLinks() {
     cy.edges().removeClass("shown hot");
     cy.nodes().removeClass("neighbor");
     let shown = cy.collection();
-    if (state.links === "all") shown = cy.edges();
+    if (state.focus) shown = cy.nodes(".focus").edgesWith(cy.nodes(".focus"));
+    else if (state.links === "all") shown = cy.edges();
     if (state.links === "changed") {
       const changed = cy.nodes(".A, .M, .D, .R");
       shown = changed.edgesWith(changed);
@@ -672,6 +687,7 @@ function pickSession(id) {
 }
 
 function applyTrail() {
+  scheduleBoxes();
   const t = state.claude;
   cy.batch(() => {
     cy.nodes().removeClass("trail-read trail-edit");
@@ -686,6 +702,7 @@ function applyTrail() {
     if (node) flash(node);
   }
   lastFlash = key;
+  if (state.focus) applyFocus(true);
 }
 
 function nodeOf(path) {
@@ -698,6 +715,188 @@ function flash(node) {
   node
     .animate({ style: { "underlay-opacity": 0.9, "underlay-padding": 12 } }, { duration: 180 })
     .animate({ style: { "underlay-opacity": 0.38, "underlay-padding": 6 } }, { duration: 1400, complete: () => node.removeStyle("underlay-opacity underlay-padding") });
+}
+
+// ---------------------------------------------------------------- session view
+//
+// Opening a session shows only what it touched: the modules it edited (marked)
+// and read (fainter), as a graph of the links between them, laid out top-down
+// by who requires whom, each labelled with the folder it lives in. Everything
+// else is hidden, and the folders they sit in are kept but not drawn. "Whole
+// map" puts the map back exactly as it was; positions are never saved while the
+// session view is up.
+
+let focusSnapshot = null;
+let focusKey = "";
+
+function touchedNodes() {
+  const t = state.claude;
+  let nodes = cy.collection();
+  for (const path of [...(t?.edits ?? []), ...(t?.reads ?? [])]) {
+    const node = nodeOf(path);
+    if (node) nodes = nodes.union(node);
+  }
+  return nodes;
+}
+
+function enterFocus() {
+  if (!state.focus) {
+    focusSnapshot = {};
+    leaves().forEach((n) => {
+      focusSnapshot[n.id()] = { ...n.position() };
+    });
+    state.focus = true;
+    focusKey = "";
+    document.body.classList.add("focused");
+  }
+  applyFocus(true);
+}
+
+function applyFocus(layout) {
+  const touched = touchedNodes();
+  cy.batch(() => {
+    cy.nodes().removeClass("off ghost focus");
+    cy.nodes().not(touched.union(touched.ancestors())).addClass("off");
+    touched.ancestors().addClass("ghost");
+    touched.addClass("focus");
+    touched.forEach((n) => {
+      const where = n.parent().id().split("/").slice(-2).join(".");
+      n.data("display", where ? `${n.data("label")}\n${where}` : n.data("label"));
+      n.data("fw", Math.max(n.data("label").length, where.length) * 9.2 + 28);
+    });
+  });
+  showLinks();
+  const key = touched.map((n) => n.id()).sort().join("|");
+  if (!layout || key === focusKey) return scheduleBoxes();
+  focusKey = key;
+  if (touched.empty()) return scheduleBoxes();
+  const positions = layers(touched);
+  const layoutRun = touched.layout({
+    name: "preset",
+    positions: (n) => positions[n.id()],
+    animate: true,
+    animationDuration: 350,
+    fit: true,
+    padding: 70,
+  });
+  layoutRun.one("layoutstop", () => {
+    if (cy.zoom() > 1.2) cy.zoom({ level: 1.2, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } });
+    scheduleBoxes();
+  });
+  layoutRun.run();
+}
+
+// Rows by who requires whom: a module sits a row below everything here that
+// requires (or starts, or fires a remote at) it. Rows wider than the graph
+// area wrap, so a session that touched many modules nobody here requires
+// doesn't spread into one long line too small to read.
+const ROW_GAP = 120;
+const COLUMN_GAP = 48;
+
+function layers(nodes) {
+  const level = new Map(nodes.map((n) => [n.id(), 0]));
+  const edges = nodes.edgesWith(nodes).filter((e) => e.source().id() !== e.target().id());
+  for (let pass = 0; pass < nodes.length; pass++) {
+    let moved = false;
+    edges.forEach((e) => {
+      const want = level.get(e.source().id()) + 1;
+      if (want > level.get(e.target().id()) && want < nodes.length) {
+        level.set(e.target().id(), want);
+        moved = true;
+      }
+    });
+    if (!moved) break;
+  }
+  const width = Math.max(600, (cy.width() - 140) / 0.9);
+  const rows = [];
+  for (const depth of [...new Set(level.values())].sort((x, y) => x - y)) {
+    const members = nodes.filter((n) => level.get(n.id()) === depth).sort((x, y) => x.data("label").localeCompare(y.data("label")));
+    let row = [];
+    let used = 0;
+    members.forEach((n) => {
+      const w = n.data("fw");
+      if (row.length && used + COLUMN_GAP + w > width) {
+        rows.push(row);
+        row = [];
+        used = 0;
+      }
+      used += (row.length ? COLUMN_GAP : 0) + w;
+      row.push(n);
+    });
+    if (row.length) rows.push(row);
+  }
+  const positions = {};
+  rows.forEach((row, r) => {
+    const total = row.reduce((sum, n) => sum + n.data("fw"), 0) + (row.length - 1) * COLUMN_GAP;
+    let x = -total / 2;
+    for (const n of row) {
+      positions[n.id()] = { x: x + n.data("fw") / 2, y: r * ROW_GAP };
+      x += n.data("fw") + COLUMN_GAP;
+    }
+  });
+  return positions;
+}
+
+function exitFocus() {
+  if (!state.focus) return;
+  state.focus = false;
+  focusKey = "";
+  document.body.classList.remove("focused");
+  cy.nodes().removeClass("off ghost focus");
+  const snapshot = focusSnapshot;
+  focusSnapshot = null;
+  if (snapshot && leaves().every((n) => snapshot[n.id()])) leaves().forEach((n) => n.position(snapshot[n.id()]));
+  else {
+    relayout();
+    savePositions();
+  }
+  applyChange();
+  focusChange(false);
+  scheduleBoxes();
+}
+
+// A box over each module the session edited: how many lines its edits added
+// and removed, and the change in a few words (the description's label once one
+// is written, until then the functions or line the edits touched). Zoomed far
+// out a box shrinks to its counts, so neighbours don't bury each other.
+const COMPACT_ZOOM = 0.55;
+let boxesQueued = false;
+
+function scheduleBoxes() {
+  if (boxesQueued) return;
+  boxesQueued = true;
+  requestAnimationFrame(() => {
+    boxesQueued = false;
+    renderBoxes();
+  });
+}
+
+function boxText(d) {
+  if (d.label) return d.label;
+  if (d.written) return "written whole";
+  if (d.symbols.length) return d.symbols.slice(0, 3).join(" · ") + (d.symbols.length > 3 ? " …" : "");
+  return d.line ?? "";
+}
+
+function renderBoxes() {
+  const layer = $("boxes");
+  const details = state.claude?.details ?? {};
+  const compact = !state.focus && cy.zoom() < COMPACT_ZOOM;
+  const width = layer.clientWidth;
+  const height = layer.clientHeight;
+  const html = [];
+  for (const [path, d] of Object.entries(details)) {
+    const node = nodeOf(path);
+    if (!node) continue;
+    const b = node.renderedBoundingBox({ includeLabels: false });
+    if (b.x2 < 0 || b.y2 < 0 || b.x1 > width || b.y1 > height) continue;
+    const counts = `<span class="plus">+${d.added}</span> <span class="minus">−${d.removed}</span>`;
+    const text = compact ? "" : `<span class="what">${esc(boxText(d))}</span>`;
+    html.push(
+      `<div class="box${compact ? " compact" : ""}${d.label ? "" : " code"}" data-node="${esc(node.id())}" title="${esc(`${node.data("label")}: ${boxText(d)}`)}" style="left:${Math.round((b.x1 + b.x2) / 2)}px;top:${Math.round(b.y1 - 4)}px;max-width:${Math.round(Math.max(150, b.w + 24))}px"><span class="counts">${counts}</span>${text}</div>`,
+    );
+  }
+  layer.innerHTML = html.join("");
 }
 
 const isWorking = (updatedAt) => !!updatedAt && Date.now() - new Date(updatedAt).getTime() < WORKING_MS;
@@ -737,7 +936,7 @@ function sessionsHtml() {
         <span class="meta">${esc(meta)}</span></li>`;
     })
     .join("");
-  return `<h3>Sessions (${state.sessions.length})</h3><ul class="sessions">${rows}</ul>`;
+  return `<details class="switch"><summary>Switch session · ${state.sessions.length} today</summary><ul class="sessions">${rows}</ul></details>`;
 }
 
 function renderTrail(body) {
@@ -746,14 +945,26 @@ function renderTrail(body) {
     body.innerHTML = `<button class="back" data-back>← Back</button><p class="empty">Nothing from Claude in this project yet.</p>`;
     return;
   }
-  body.innerHTML = `<button class="back" data-back>← ${esc(backLabel())}</button>
+  const edited = t.edits
+    .map((path) => {
+      const d = t.details?.[path];
+      const node = nodeOf(path);
+      const [dir, base] = node ? [instancePath(node.parent().id() || ""), node.data("label")] : split(path);
+      const counts = d ? `<span class="counts"><span class="plus">+${d.added}</span> <span class="minus">−${d.removed}</span></span>` : "";
+      const label = d ? `<p class="label${d.label ? "" : " code"}">${esc(boxText(d))}</p>` : "";
+      const explained = d?.what ? `<dl class="note"><dt>What</dt><dd>${esc(d.what)}</dd><dt>Why</dt><dd>${esc(d.why)}</dd></dl>` : "";
+      return `<section class="edit" ${node ? `data-node="${esc(node.id())}"` : ""}>
+        <div class="edit-head"><span class="name">${esc(base)} <span class="where">${esc(dir)}</span></span>${counts}</div>
+        ${label}${explained}</section>`;
+    })
+    .join("");
+  body.innerHTML = `<div class="session-bar"><button class="back" data-back>← ${esc(backLabel())}</button><button data-whole-map>Whole map</button></div>
     ${sessionsHtml()}
-    <h2>Claude's trail</h2>
+    <h2>What Claude is doing</h2>
     <div class="meta">${working() ? "working now" : `last active ${ago(t.updatedAt)}`} · since your prompt ${ago(t.promptAt)}</div>
     <blockquote class="prompt">${esc(t.prompt)}</blockquote>
-    ${t.edits.length ? `<h3>Edited (${t.edits.length})</h3><ul class="refs">${trailRows(t.edits)}</ul>` : ""}
-    ${t.reads.length ? `<h3>Read (${t.reads.length})</h3><ul class="refs">${trailRows(t.reads)}</ul>` : ""}
-    ${t.edits.length || t.reads.length ? "" : `<p class="empty">Hasn't opened anything in this project yet.</p>`}`;
+    ${t.edits.length ? `<h3>Edited (${t.edits.length})</h3>${edited}` : `<p class="empty">No edits yet.</p>`}
+    ${t.reads.length ? `<h3>Read (${t.reads.length})</h3><ul class="refs">${trailRows(t.reads)}</ul>` : ""}`;
 }
 
 // ---------------------------------------------------------------- what a module does
@@ -803,6 +1014,7 @@ function hideTip() {
 }
 
 function backLabel() {
+  if (state.focus && !state.trailOpen) return "Session";
   if (!state.change) return "Back";
   return state.change.ref === WORKTREE ? "Uncommitted changes" : state.change.commit.short;
 }
@@ -901,7 +1113,7 @@ function selectNode(id, { center = false } = {}) {
 function clearSelection() {
   state.selected = null;
   state.file = null;
-  state.trailOpen = false;
+  state.trailOpen = state.focus;
   cy.elements(":selected").unselect();
   showLinks();
   renderPanel();
@@ -918,6 +1130,11 @@ function wire() {
   cy.on("mouseover", "node", (e) => showTip(e.target));
   cy.on("mouseout", "node", hideTip);
   cy.on("viewport tapstart", hideTip);
+  cy.on("viewport resize position", scheduleBoxes);
+  $("boxes").onclick = (e) => {
+    const id = e.target.closest("[data-node]")?.dataset.node;
+    if (id) selectNode(id);
+  };
 
   $("older").onclick = () => step(1);
   $("newer").onclick = () => step(-1);
@@ -948,7 +1165,17 @@ function wire() {
   }
 
   $("panel-body").onclick = (e) => {
-    if (e.target.closest("[data-back]")) return clearSelection();
+    if (e.target.closest("[data-whole-map]")) {
+      exitFocus();
+      state.trailOpen = false;
+      return renderPanel();
+    }
+    // Back from the session panel leaves the session view; back from a module
+    // opened in it returns to the session panel.
+    if (e.target.closest("[data-back]")) {
+      if (state.trailOpen) exitFocus();
+      return clearSelection();
+    }
     const session = e.target.closest("[data-session]")?.dataset.session;
     if (session) return pickSession(session);
     const nodeId = e.target.closest("[data-node]")?.dataset.node;
@@ -995,7 +1222,7 @@ function wire() {
     state.selected = null;
     state.file = null;
     cy.elements(":selected").unselect();
-    showLinks();
+    enterFocus();
     renderPanel();
   };
   setInterval(renderChip, 5000);
@@ -1042,21 +1269,42 @@ function reloadTheme() {
   old.after(next);
 }
 
+// Notices that arrive close together are handled as one, so a burst of saves
+// is one refresh rather than one per save.
 function listen() {
   const events = new EventSource("/events");
-  events.onmessage = async (message) => {
-    const event = JSON.parse(message.data);
-    if (event.theme) reloadTheme();
-    if (event.claude) await loadTrail();
-    if (event.graph) await reloadGraph();
-    if (event.explanations) {
-      await loadDescription({ fromEvent: true, structure: false });
-      const commit = state.commits.find((c) => c.hash === state.change?.ref);
-      if (commit && state.explanation?.summary) commit.explained = true;
-      if (!$("commits").hidden) renderCommits();
+  let pending = null;
+  let busy = false;
+  const drain = async () => {
+    if (busy || !pending) return;
+    busy = true;
+    const event = pending;
+    pending = null;
+    try {
+      await handle(event);
+    } finally {
+      busy = false;
+      if (pending) setTimeout(drain, 400);
     }
-    if (event.head || event.worktree) await refreshGit();
   };
+  events.onmessage = (message) => {
+    const event = JSON.parse(message.data);
+    pending = pending ? Object.fromEntries(Object.keys({ ...pending, ...event }).map((k) => [k, pending[k] || event[k]])) : event;
+    setTimeout(drain, 400);
+  };
+}
+
+async function handle(event) {
+  if (event.theme) reloadTheme();
+  if (event.graph) await reloadGraph();
+  if (event.head || event.worktree) await refreshGit();
+  if (event.explanations) {
+    await loadDescription({ fromEvent: true, structure: false });
+    const commit = state.commits.find((c) => c.hash === state.change?.ref);
+    if (commit && state.explanation?.summary) commit.explained = true;
+    if (!$("commits").hidden) renderCommits();
+  }
+  if (event.claude || event.explanations || event.graph) await loadTrail();
 }
 
 async function main() {

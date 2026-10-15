@@ -44,8 +44,76 @@ export type Trail = {
   // Kept apart from `latest`, so an edit followed by a read in the same message
   // still reaches the page as an edit.
   lastEdit: { path: string; at: string } | null;
+  // What this session's edits did to each file, worked out from the edit calls
+  // themselves (not from git, which would mix in other sessions' work).
+  details: Record<string, EditDetail>;
   updatedAt: string | null;
 };
+
+export type EditDetail = {
+  count: number;
+  added: number;
+  removed: number;
+  // Functions and locals the edits added, removed or changed lines in, or the
+  // function they fell inside; at most a few.
+  symbols: string[];
+  // The first line the edits added (or removed, with a leading "-"), for an
+  // edit that touched no named thing.
+  line: string | null;
+  written: boolean;
+  at: string;
+  // A few words naming the change, from the description of the uncommitted
+  // work or of the last commit; the server adds it, the transcript never does.
+  label?: string;
+  what?: string;
+  why?: string;
+};
+
+const SYMBOL_PATTERNS = [
+  /\bfunction\s+([A-Za-z_][\w.:]*)\s*\(/,
+  /^\s*local\s+([A-Za-z_]\w*)\s*=/,
+  /^\s*([A-Za-z_][\w.]*)\s*=\s*function\b/,
+];
+const symbolIn = (line: string) => {
+  for (const p of SYMBOL_PATTERNS) {
+    const m = line.match(p);
+    if (m) return m[1];
+  }
+  return null;
+};
+
+// Lines added and removed between two versions of an edited block: the lines
+// both share at the start and end are skipped, and the middle is compared line
+// by line (a longest-common-subsequence count) unless it is too long for that.
+function lineDiff(before: string, after: string) {
+  const a = before ? before.split("\n") : [];
+  const b = after ? after.split("\n") : [];
+  let start = 0;
+  while (start < a.length && start < b.length && a[start] === b[start]) start++;
+  let end = 0;
+  while (end < a.length - start && end < b.length - start && a[a.length - 1 - end] === b[b.length - 1 - end]) end++;
+  const x = a.slice(start, a.length - end);
+  const y = b.slice(start, b.length - end);
+  const keep = new Set<number>();
+  if (x.length && y.length && x.length * y.length <= 90_000) {
+    const table = Array.from({ length: x.length + 1 }, () => new Uint16Array(y.length + 1));
+    for (let i = x.length - 1; i >= 0; i--)
+      for (let j = y.length - 1; j >= 0; j--) table[i][j] = x[i] === y[j] ? table[i + 1][j + 1] + 1 : Math.max(table[i + 1][j], table[i][j + 1]);
+    for (let i = 0, j = 0; i < x.length && j < y.length; ) {
+      if (x[i] === y[j]) {
+        keep.add(j);
+        i++;
+        j++;
+      } else if (table[i + 1][j] >= table[i][j + 1]) i++;
+      else j++;
+    }
+  }
+  const added = y.filter((_, j) => !keep.has(j));
+  const shared = keep.size;
+  const removed = x.length - shared;
+  const removedLines = shared ? x.filter((line) => !y.includes(line)) : x;
+  return { added, removedLines, removed, start, context: b.slice(0, start) };
+}
 
 export type SessionInfo = {
   id: string;
@@ -84,7 +152,7 @@ class Transcript {
   }
 
   static empty(session: string): Trail {
-    return { session, prompt: null, promptAt: null, reads: [], edits: [], latest: null, lastEdit: null, updatedAt: null };
+    return { session, prompt: null, promptAt: null, reads: [], edits: [], latest: null, lastEdit: null, details: {}, updatedAt: null };
   }
 
   update() {
@@ -106,7 +174,8 @@ class Transcript {
   private inProject(path: unknown): string | null {
     if (typeof path !== "string" || !isAbsolute(path)) return null;
     const rel = relative(this.project, path);
-    return rel && !rel.startsWith("..") && !isAbsolute(rel) ? rel : null;
+    if (!rel || rel.startsWith("..") || isAbsolute(rel) || rel === ".git" || rel.startsWith(".git/")) return null;
+    return rel;
   }
 
   private mark(path: string | null, kind: "read" | "edit", at: string) {
@@ -116,6 +185,36 @@ class Transcript {
     this.trail.edits = [...this.edits];
     this.trail.latest = { path, kind, at };
     if (kind === "edit") this.trail.lastEdit = { path, at };
+  }
+
+  private detail(path: string, tool: string, input: Record<string, unknown>, at: string) {
+    const text = (v: unknown) => (typeof v === "string" ? v : "");
+    const pairs: [string, string][] =
+      tool === "MultiEdit"
+        ? ((input.edits as { old_string?: string; new_string?: string }[] | undefined) ?? []).map((e) => [text(e.old_string), text(e.new_string)])
+        : tool === "Write"
+          ? [["", text(input.content)]]
+          : tool === "NotebookEdit"
+            ? [["", text(input.new_source)]]
+            : [[text(input.old_string), text(input.new_string)]];
+    const d = this.trail.details[path] ?? { count: 0, added: 0, removed: 0, symbols: [], line: null, written: false, at };
+    d.count++;
+    d.at = at;
+    if (tool === "Write") d.written = true;
+    for (const [before, after] of pairs) {
+      const diff = lineDiff(before, after);
+      d.added += diff.added.length;
+      d.removed += diff.removed;
+      if (tool === "Write") continue;
+      const named = [...diff.added, ...diff.removedLines].map(symbolIn).filter((s): s is string => !!s);
+      if (!named.length) {
+        const around = [...diff.context].reverse().map((l) => l.match(SYMBOL_PATTERNS[0])?.[1]).find(Boolean);
+        if (around) named.push(around);
+      }
+      for (const s of named) if (!d.symbols.includes(s)) d.symbols.push(s);
+      d.line ??= diff.added.find((l) => l.trim())?.trim() ?? (diff.removedLines.find((l) => l.trim()) ? `-${diff.removedLines.find((l) => l.trim())!.trim()}` : null);
+    }
+    this.trail.details[path] = d;
   }
 
   private take(text: string) {
@@ -139,7 +238,11 @@ class Transcript {
       if (c.type !== "tool_use" || !c.input) continue;
       this.trail.updatedAt = at;
       if (c.name === "Read") this.mark(this.inProject(c.input.file_path), "read", at);
-      else if (EDITS.has(c.name ?? "")) this.mark(this.inProject(c.input.file_path ?? c.input.notebook_path), "edit", at);
+      else if (EDITS.has(c.name ?? "")) {
+        const path = this.inProject(c.input.file_path ?? c.input.notebook_path);
+        this.mark(path, "edit", at);
+        if (path) this.detail(path, c.name!, c.input, at);
+      }
       else if (c.name === "Bash" && typeof c.input.command === "string") {
         for (const path of c.input.command.match(/\/[^\s'"`;&|()<>]+/g) ?? []) this.mark(this.inProject(path), "read", at);
       }
@@ -190,11 +293,13 @@ export class Follower {
   }
 
   // The sessions on offer and the trail of the one asked for. Without one (or
-  // when it's no longer on offer): the most recent session that has read or
-  // edited something here since its prompt, else the most recent of all.
+  // when it's no longer on offer): the most recent session that has edited
+  // something here since its prompt, else one that has read something, else the
+  // most recent of all.
   view(session: string | null): { sessions: SessionInfo[]; trail: Trail | null } {
     const sessions = this.sessions();
-    const chosen = sessions.find((s) => s.id === session) ?? sessions.find((s) => s.edits + s.reads > 0) ?? sessions[0];
+    const chosen =
+      sessions.find((s) => s.id === session) ?? sessions.find((s) => s.edits > 0) ?? sessions.find((s) => s.reads > 0) ?? sessions[0];
     const transcript = chosen && [...this.transcripts.values()].find((t) => t.trail.session === chosen.id);
     return { sessions, trail: transcript ? transcript.trail : null };
   }

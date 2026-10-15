@@ -393,3 +393,43 @@ body.wide { --panel-w: 72%; }
 .sessions .dot.working { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
 .sessions .prompt-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sessions .meta { grid-column: 2; font-size: 13px; }
+
+.boxes { position: absolute; inset: 0; pointer-events: none; z-index: 4; overflow: hidden; }
+.box {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: 300px;
+  padding: 3px 8px;
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.35;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgb(0 0 0 / .5);
+}
+.box:hover { z-index: 1; border-color: var(--text); }
+.box .counts { font: 12px var(--mono); flex: none; }
+.box .what { overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.box.code .what { font-family: var(--mono); color: var(--muted); }
+.box.compact { padding: 1px 6px; gap: 0; }
+
+.session-bar { display: flex; justify-content: space-between; align-items: center; }
+.session-bar button[data-whole-map] { font-size: 13px; padding: 2px 10px; }
+.edit { margin: 10px 0 0; padding: 8px 10px; border-left: 2px solid var(--line); border-radius: 0 6px 6px 0; }
+.edit[data-node] { cursor: pointer; }
+.edit[data-node]:hover { background: var(--raised); border-left-color: var(--accent); }
+.edit-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.edit-head .name { font: 15px var(--mono); }
+.edit .label { margin: 4px 0 0; color: var(--accent); }
+.edit .label.code { font-family: var(--mono); color: var(--muted); }
+.edit .note { margin-top: 6px; }
+
+.switch { margin: 10px 0 4px; }
+.switch summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+.switch[open] summary { margin-bottom: 6px; }

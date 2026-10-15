@@ -24,7 +24,7 @@ import { join } from "node:path";
 import { type Repo, WORKTREE } from "./git.ts";
 
 export type Feature = { name: string; description: string; files: string[] };
-export type FileNote = { what: string; why: string };
+export type FileNote = { label?: string; what: string; why: string };
 export type Description = { summary?: string; features: Feature[]; files: Record<string, FileNote> };
 export type Note = Description & { version: 1; at: string; by: "session" | "diff"; session?: string };
 export type WorktreeEntry = Description & { at: string; session: string | null; fingerprints: Record<string, string> };
@@ -137,9 +137,8 @@ export class Store {
   // What each uncommitted file's diff looks like now, as a short hash.
   fingerprints(): Record<string, string> {
     const prints: Record<string, string> = {};
-    for (const f of this.repo.changes(WORKTREE)) {
-      prints[f.path] = Bun.hash(this.repo.diff(WORKTREE, f.path, f.oldPath)).toString(36);
-    }
+    const diffs = this.repo.diffs();
+    for (const f of this.repo.changes(WORKTREE)) prints[f.path] = Bun.hash(diffs.get(f.path) ?? "").toString(36);
     return prints;
   }
 

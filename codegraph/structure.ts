@@ -56,7 +56,19 @@ export function liveGraph(project: string): Graph {
   });
 }
 
+// A commit's tree never changes, so its graph is kept by its hash.
+const commitGraphs = new Map<string, Graph>();
+
 export function graphAt(repo: Repo, rev: string): Graph {
+  const hash = repo.run(["rev-parse", "--verify", "--quiet", `${rev}^{commit}`], [1]).trim();
+  const kept = hash && commitGraphs.get(hash);
+  if (kept) return kept;
+  const graph = unpackGraph(repo, hash || rev);
+  if (hash) commitGraphs.set(hash, graph);
+  return graph;
+}
+
+function unpackGraph(repo: Repo, rev: string): Graph {
   return scratch((dir) => {
     const unpacked = Bun.spawnSync(["sh", "-c", 'git -C "$1" archive "$2" | tar -x -C "$3"', "sh", repo.top, rev, dir], {
       stdout: "ignore",
@@ -110,8 +122,8 @@ const cache = new Map<string, Structure>();
 
 // A commit compares with its first parent (nothing, for the first commit); the
 // uncommitted work compares with HEAD. Commits never change, so they are kept.
-export function structure(repo: Repo, ref: string): Structure {
-  if (ref === WORKTREE) return compare(repo.head() ? graphAt(repo, "HEAD") : EMPTY, liveGraph(repo.project));
+export function structure(repo: Repo, ref: string, live: () => Graph = () => liveGraph(repo.project)): Structure {
+  if (ref === WORKTREE) return compare(repo.head() ? graphAt(repo, "HEAD") : EMPTY, live());
   const hit = cache.get(ref);
   if (hit) return hit;
   const parent = repo.run(["rev-parse", "--verify", "--quiet", `${ref}^`], [1]).trim();

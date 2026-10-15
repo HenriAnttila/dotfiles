@@ -88,14 +88,41 @@ const flush = () => {
   if (event.graph || event.head || event.worktree || event.explanations) broadcast(event);
 };
 
+// The answers that run Rojo or git over the whole working tree are worked out
+// at most once per round of changes: every file event in the project or its
+// git folder starts a new generation, and a request in the same generation
+// reuses the answer. Without this, a session saving files every few seconds
+// makes the page ask for the same things again faster than the server can
+// answer them, one after another.
+// The graph has its own generation, moved on only by changes that can alter
+// it (a script, the sourcemap, the project file), since it is the slowest to
+// work out and git's own bookkeeping touches files constantly.
+let generation = 0;
+let graphGeneration = 0;
+const memo = new Map<string, { generation: number; value: unknown }>();
+function once<T>(key: string, compute: () => T, gen = generation): T {
+  const hit = memo.get(key);
+  if (hit && hit.generation === gen) return hit.value as T;
+  const value = compute();
+  memo.set(key, { generation: gen, value });
+  return value;
+}
+const graphNow = () => once("graph", () => liveGraph(project), graphGeneration);
+const printsNow = () => once("prints", () => store.fingerprints());
+const worktreeNow = () => once("worktree", () => store.worktree(printsNow()));
+
 const changed = (file: string, inGitDir: boolean) => {
+  generation++;
   if (inGitDir) {
     if (/^codegraph\/purposes\.json/.test(file)) pending.purposes = true;
     else if (/^(refs\/notes\/|codegraph\/(worktree\.json|jobs\/))/.test(file)) pending.explanations = true;
     else if (/^(HEAD|index|packed-refs|refs\/)/.test(file)) pending.git = true;
     else return;
   } else {
-    if (file === "sourcemap.json" || /\.luau?$/.test(file)) pending.graph = true;
+    if (file === "sourcemap.json" || /\.luau?$|\.project\.json$/.test(file)) {
+      pending.graph = true;
+      graphGeneration++;
+    }
     pending.git = true;
   }
   timer ??= setTimeout(flush, 300);
@@ -153,12 +180,12 @@ function explain(ref: string): boolean {
   let key = ref;
   if (ref === "purposes") {
     const purposes = store.read<Record<string, { hash: string }>>("purposes.json", {});
-    const missing = liveGraph(project).nodes.filter((n) => n.kind === "script" && !n.external && !n.doc && purposes[n.id]?.hash !== n.hash);
+    const missing = graphNow().nodes.filter((n) => n.kind === "script" && !n.external && !n.doc && purposes[n.id]?.hash !== n.hash);
     if (!missing.length) return false;
     key = `purposes:${missing.map((n) => `${n.id}:${n.hash}`).sort().join("|")}`;
   } else if (ref === WORKTREE) {
-    const prints = store.fingerprints();
-    const waiting = store.worktree(prints).pending;
+    const prints = printsNow();
+    const waiting = worktreeNow().pending;
     if (!waiting.length) return false;
     key = waiting.map((p) => `${p}:${prints[p]}`).sort().join("|");
   } else if (store.note(ref)) {
@@ -183,7 +210,7 @@ const routes: Record<string, (url: URL, req: Request) => Response | Promise<Resp
   // Each script that doesn't open with a comment gets the sentence explain.ts
   // wrote for it, while that sentence still matches the file.
   "/api/graph": () => {
-    const graph = liveGraph(project);
+    const graph = structuredClone(graphNow());
     const purposes = store.read<Record<string, { hash: string; text: string }>>("purposes.json", {});
     for (const n of graph.nodes) {
       const p = purposes[n.id];
@@ -192,7 +219,23 @@ const routes: Record<string, (url: URL, req: Request) => Response | Promise<Resp
     return json({ project: basename(project), ...graph });
   },
 
-  "/api/claude": (url) => json(follower.view(url.searchParams.get("session"))),
+  // Each file the session edited gets the label from the description of the
+  // uncommitted work, or of the last commit when the edit is already committed.
+  "/api/claude": (url) => {
+    const view = structuredClone(follower.view(url.searchParams.get("session")));
+    const details = view.trail?.details ?? {};
+    if (Object.keys(details).length) {
+      const uncommitted = worktreeNow().files;
+      const head = repo.head();
+      const committed = head ? (store.note(head)?.files ?? {}) : {};
+      for (const [path, d] of Object.entries(details)) {
+        const note = uncommitted[path] ?? committed[path];
+        if (note?.label) d.label = note.label;
+        if (note) Object.assign(d, { what: note.what, why: note.why });
+      }
+    }
+    return json(view);
+  },
 
   "/api/purposes": (_, req) => {
     if (req.method !== "POST") return json({ error: "POST to start" }, 400);
@@ -209,7 +252,7 @@ const routes: Record<string, (url: URL, req: Request) => Response | Promise<Resp
 
   "/api/change": (url) => {
     const ref = url.searchParams.get("ref") ?? WORKTREE;
-    if (ref === WORKTREE) return json({ ref, commit: null, files: repo.changes(ref) });
+    if (ref === WORKTREE) return json({ ref, commit: null, files: once("changes", () => repo.changes(ref)) });
     const commit = repo.commit(ref);
     if (!commit) return json({ error: `no commit ${ref}` }, 404);
     return json({ ref: commit.hash, commit, files: repo.changes(commit.hash) });
@@ -224,6 +267,7 @@ const routes: Record<string, (url: URL, req: Request) => Response | Promise<Resp
 
   "/api/structure": (url) => {
     const ref = refFrom(url);
+    if (ref === WORKTREE) return json(once("structure", () => structure(repo, ref, graphNow)));
     return ref ? json(structure(repo, ref)) : json({ error: "no such change" }, 404);
   },
 
@@ -232,7 +276,7 @@ const routes: Record<string, (url: URL, req: Request) => Response | Promise<Resp
   "/api/explanation": (url) => {
     const ref = refFrom(url);
     if (!ref) return json({ error: "no such change" }, 404);
-    if (ref === WORKTREE) return json({ ...store.worktree(), running: store.running(WORKTREE) });
+    if (ref === WORKTREE) return json({ ...worktreeNow(), running: store.running(WORKTREE) });
     const note = store.note(ref);
     return json({ ...(note ?? { features: [], files: {} }), pending: note ? [] : null, running: store.running(ref) });
   },

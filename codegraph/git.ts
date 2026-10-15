@@ -190,6 +190,28 @@ export class Repo {
     return counts;
   }
 
+  // Every uncommitted file's diff against HEAD from one git call, by path; an
+  // untracked file's contents stand in for its diff. No rename detection, which
+  // is most of what a diff per file costs.
+  diffs(): Map<string, string> {
+    const found = new Map<string, string>();
+    const files = this.changes(WORKTREE);
+    const out = this.head() ? this.run(["diff", "HEAD", "--no-color", "--no-ext-diff"]) : "";
+    for (const chunk of out.split(/^(?=diff --git )/m)) {
+      const m = chunk.match(/^diff --git a\/.+? b\/(.+)$/m);
+      if (m) found.set(this.toProject(m[1]), chunk);
+    }
+    for (const f of files) {
+      if (found.has(f.path)) continue;
+      try {
+        found.set(f.path, readFileSync(join(this.top, this.toRepo(f.path)), "utf8"));
+      } catch {
+        found.set(f.path, "");
+      }
+    }
+    return found;
+  }
+
   diff(ref: string, path: string, oldPath?: string): string {
     const paths = [this.toRepo(path), ...(oldPath ? [this.toRepo(oldPath)] : [])];
     if (ref !== WORKTREE) {

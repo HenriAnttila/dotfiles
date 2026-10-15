@@ -49,8 +49,8 @@ const SCHEMA = {
       type: "array",
       items: {
         type: "object",
-        required: ["path", "what", "why"],
-        properties: { path: { type: "string" }, what: { type: "string" }, why: { type: "string" } },
+        required: ["path", "label", "what", "why"],
+        properties: { path: { type: "string" }, label: { type: "string" }, what: { type: "string" }, why: { type: "string" } },
       },
     },
   },
@@ -96,7 +96,7 @@ Keep every text short: a sentence or two, in plain words, without file paths in 
 
 - summary: what this change does to the game, and why.
 - features: group the changed files by the feature they serve. For each, a short name (a few words) and a description of what changed for that feature, structurally (the modules and links that came or went, from the structure list below) and why. Every file belongs to exactly one feature.
-- files: one entry per changed file, with the path exactly as listed. what: what code changed in it, concretely (functions, fields, behaviour). why: why it changed.
+- files: one entry per changed file, with the path exactly as listed. label: the change in a few words (at most six), for a small tag on the map, e.g. "walk-in speed matched to animation". what: what code changed in it, concretely (functions, fields, behaviour). why: why it changed.
 
 ${o.header}
 
@@ -147,7 +147,7 @@ async function claude<T>(store: Store, text: string, schema: object, session?: S
   return answer ?? null;
 }
 
-type Answer = { summary: string; features: Description["features"]; files: { path: string; what: string; why: string }[] };
+type Answer = { summary: string; features: Description["features"]; files: { path: string; label?: string; what: string; why: string }[] };
 
 async function ask(store: Store, text: string, session?: Session): Promise<(Description & { by: "session" | "diff"; session?: string }) | null> {
   const answer = await claude<Answer>(store, text, SCHEMA, session);
@@ -157,7 +157,7 @@ async function ask(store: Store, text: string, session?: Session): Promise<(Desc
   return {
     summary: answer.summary,
     features: answer.features ?? [],
-    files: Object.fromEntries((answer.files ?? []).map((f) => [f.path, { what: f.what, why: f.why }])),
+    files: Object.fromEntries((answer.files ?? []).map((f) => [f.path, { ...(f.label ? { label: f.label } : {}), what: f.what, why: f.why }])),
     by: session ? "session" : "diff",
     ...(session ? { session: session.id } : {}),
   };
