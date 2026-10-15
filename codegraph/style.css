@@ -1,25 +1,58 @@
+/* Fallbacks only: /theme.css (theme.ts) replaces these with the colours and
+   font Ghostty and tmux are using. These are onedark_dark's. */
 :root {
   --bg: #000000;
-  --surface: #0b0c10;
-  --raised: #16181f;
-  --line: #262a34;
-  --text: #d8dbe2;
-  --muted: #8b92a3;
-  --faint: #5d6474;
-  --accent: #7aa2f7;
-  --added: #73c991;
-  --modified: #e2b553;
-  --deleted: #f07178;
-  --renamed: #82aaff;
-  --require: #56607a;
-  --starts: #b48ead;
-  --remote: #e5a05b;
-  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
-  --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  --surface: #000000;
+  --raised: #212121;
+  --line: #1f2022;
+  --text: #abb2bf;
+  --muted: #676b73;
+  --faint: #333539;
+  --accent: #dcdcaa;
+  --added: #89ca78;
+  --modified: #e5c07b;
+  --deleted: #ef596f;
+  --renamed: #61afef;
+  --require: #44474c;
+  --starts: #d55fde;
+  --remote: #2bbac5;
+  --syntax-keyword: #d55fde;
+  --syntax-string: #89ca78;
+  --syntax-number: #e5c07b;
+  --syntax-function: #61afef;
+  --syntax-builtin: #2bbac5;
+  --syntax-property: #ef596f;
+  --mono: "JetBrainsMono Nerd Font", ui-monospace, "SF Mono", Menlo, monospace;
+  --sans: var(--mono);
   --panel-w: 40%;
   color-scheme: dark;
-}
 
+  /* diff2html's dark theme, on the same colours */
+  --d2h-dark-bg-color: var(--bg);
+  --d2h-dark-color: var(--text);
+  --d2h-dark-dim-color: var(--muted);
+  --d2h-dark-border-color: var(--line);
+  --d2h-dark-line-border-color: var(--line);
+  --d2h-dark-file-header-bg-color: var(--bg);
+  --d2h-dark-file-header-border-color: var(--line);
+  --d2h-dark-empty-placeholder-bg-color: var(--bg);
+  --d2h-dark-empty-placeholder-border-color: var(--line);
+  --d2h-dark-ins-bg-color: color-mix(in srgb, var(--added) 10%, transparent);
+  --d2h-dark-ins-border-color: color-mix(in srgb, var(--added) 35%, transparent);
+  --d2h-dark-ins-highlight-bg-color: color-mix(in srgb, var(--added) 30%, transparent);
+  --d2h-dark-ins-label-color: var(--added);
+  --d2h-dark-del-bg-color: color-mix(in srgb, var(--deleted) 10%, transparent);
+  --d2h-dark-del-border-color: color-mix(in srgb, var(--deleted) 35%, transparent);
+  --d2h-dark-del-highlight-bg-color: color-mix(in srgb, var(--deleted) 30%, transparent);
+  --d2h-dark-del-label-color: var(--deleted);
+  --d2h-dark-change-ins-color: color-mix(in srgb, var(--added) 18%, transparent);
+  --d2h-dark-change-del-color: color-mix(in srgb, var(--modified) 15%, transparent);
+  --d2h-dark-change-label-color: var(--modified);
+  --d2h-dark-info-bg-color: color-mix(in srgb, var(--accent) 6%, transparent);
+  --d2h-dark-info-border-color: var(--line);
+  --d2h-dark-selected-color: color-mix(in srgb, var(--accent) 10%, transparent);
+  --d2h-dark-moved-label-color: var(--renamed);
+}
 
 * { box-sizing: border-box; }
 
@@ -28,7 +61,7 @@ html, body {
   height: 100%;
   background: var(--bg);
   color: var(--text);
-  font: 13px/1.45 var(--sans);
+  font: 12.5px/1.5 var(--sans);
 }
 
 body {
@@ -251,7 +284,17 @@ body.wide { --panel-w: 72%; }
 .diff .d2h-files-diff, .diff .d2h-file-diff { overflow-x: auto; }
 .diff .d2h-file-header { display: none; }
 .diff .d2h-wrapper, .diff .d2h-file-wrapper { border-radius: 6px; }
-.diff .d2h-code-line, .diff .d2h-code-side-line { font-family: var(--mono); }
+.diff .d2h-code-line, .diff .d2h-code-side-line, .diff .d2h-code-linenumber, .diff .d2h-code-side-linenumber { font-family: var(--mono); }
+
+/* Code in the diffs, coloured like the terminal's palette */
+.hljs { color: var(--text); background: transparent; }
+.hljs-keyword, .hljs-selector-tag, .hljs-operator { color: var(--syntax-keyword); }
+.hljs-string, .hljs-regexp { color: var(--syntax-string); }
+.hljs-number, .hljs-literal, .hljs-type, .hljs-title.class_ { color: var(--syntax-number); }
+.hljs-title, .hljs-title.function_, .hljs-section { color: var(--syntax-function); }
+.hljs-built_in, .hljs-meta, .hljs-symbol { color: var(--syntax-builtin); }
+.hljs-attr, .hljs-variable, .hljs-property, .hljs-template-variable { color: var(--syntax-property); }
+.hljs-comment, .hljs-quote { color: var(--muted); font-style: italic; }
 
 .legend {
   display: flex;

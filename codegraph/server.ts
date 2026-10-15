@@ -13,6 +13,9 @@
 // server-sent events when the graph or git changed, so a save or a commit shows
 // up without a reload.
 //
+// Colours and font come from Ghostty and tmux (theme.ts), and follow a theme
+// pick while the page is open.
+//
 // Node positions are kept in .git/codegraph/layout.json in the project's
 // repository, so the map stays the same between runs and never gets committed.
 
@@ -20,6 +23,7 @@ import { existsSync, mkdirSync, readFileSync, watch, writeFileSync } from "node:
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { buildGraph } from "./graph.ts";
 import { Repo, WORKTREE } from "./git.ts";
+import { GHOSTTY_DIR, themeCss } from "./theme.ts";
 
 let project = process.cwd();
 let port = 7420;
@@ -93,12 +97,24 @@ watch(project, { recursive: true }, (_, file) => {
 });
 if (!gitInProject) watch(repo.gitDir, { recursive: true }, (_, file) => file && changed(file.toString(), true));
 
+// A theme pick rewrites Ghostty's theme.generated; the page swaps in the new colours.
+let themeTimer: Timer | null = null;
+if (existsSync(GHOSTTY_DIR)) {
+  watch(GHOSTTY_DIR, () => {
+    themeTimer ??= setTimeout(() => {
+      themeTimer = null;
+      broadcast({ theme: true });
+    }, 300);
+  });
+}
+
 const json = (data: unknown, status = 200) => Response.json(data, { status });
 
 const routes: Record<string, (url: URL, req: Request) => Response | Promise<Response>> = {
   "/": () => new Response(Bun.file(join(here, "index.html"))),
   "/app.js": () => new Response(Bun.file(join(here, "app.js"))),
   "/style.css": () => new Response(Bun.file(join(here, "style.css"))),
+  "/theme.css": () => new Response(themeCss(), { headers: { "content-type": "text/css", "cache-control": "no-store" } }),
 
   "/api/graph": () => json({ project: basename(project), ...buildGraph(project) }),
 

@@ -718,10 +718,24 @@ function wire() {
   });
 }
 
+// A new stylesheet first, then the graph's colours, which cytoscape keeps as
+// values rather than CSS variables.
+function reloadTheme() {
+  const old = $("theme");
+  const next = old.cloneNode();
+  next.href = `/theme.css?${Date.now()}`;
+  next.onload = () => {
+    old.remove();
+    cy.style(styles());
+  };
+  old.after(next);
+}
+
 function listen() {
   const events = new EventSource("/events");
   events.onmessage = async (message) => {
     const event = JSON.parse(message.data);
+    if (event.theme) reloadTheme();
     if (event.graph) await reloadGraph();
     if (event.head || event.worktree) await refreshGit();
   };
