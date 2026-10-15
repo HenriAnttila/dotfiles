@@ -354,3 +354,26 @@ body.wide { --panel-w: 72%; }
   .search { width: 130px; }
   :root { --panel-w: 50%; }
 }
+
+.about { margin: 12px 0 4px; }
+.about p { margin: 0; }
+.about .by { margin-top: 4px; }
+.about details { margin-top: 6px; }
+.about summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+.about pre { white-space: pre-wrap; font: 14px/1.5 var(--mono); color: var(--muted); margin: 6px 0 0; }
+.about-missing { margin-top: 10px; }
+
+.tip {
+  position: absolute;
+  z-index: 5;
+  max-width: 440px;
+  padding: 8px 10px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / .45);
+  pointer-events: none;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.tip b { display: block; color: var(--accent); font-weight: 600; margin-bottom: 2px; }

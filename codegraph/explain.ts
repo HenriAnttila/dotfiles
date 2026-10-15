@@ -4,6 +4,10 @@
 //
 //   explain.ts <project> commit <hash> [--session <id> --cwd <dir>]
 //   explain.ts <project> worktree
+//   explain.ts <project> purposes
+//
+// It also writes what each module is for, for the modules whose code doesn't
+// open with a comment that says so (see "purposes" below).
 //
 // hook.ts runs the commit form right after Claude commits, naming the session
 // that made the commit; server.ts runs either form when the page shows a change
@@ -22,9 +26,11 @@
 // CODEGRAPH_FORK is set for every claude it starts, so hook.ts ignores the
 // tool calls those make and a description never sets off another.
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { Repo, WORKTREE, type ChangedFile } from "./git.ts";
 import { type Description, type Sessions, Store } from "./store.ts";
-import { describe, structure } from "./structure.ts";
+import { describe, liveGraph, structure } from "./structure.ts";
 
 const SCHEMA = {
   type: "object",
@@ -104,13 +110,15 @@ Diffs:
 ${o.diff}`;
 }
 
-async function ask(store: Store, text: string, session?: Session): Promise<(Description & { by: "session" | "diff"; session?: string }) | null> {
+// One claude run that answers in the given JSON shape, or null (logged) when it
+// fails. A fork when a session is given, a fresh run otherwise.
+async function claude<T>(store: Store, text: string, schema: object, session?: Session): Promise<T | null> {
   const args = [
     "-p",
     "--output-format",
     "json",
     "--json-schema",
-    JSON.stringify(SCHEMA),
+    JSON.stringify(schema),
     "--no-session-persistence",
     "--disallowedTools",
     NO_TOOLS,
@@ -130,13 +138,20 @@ async function ask(store: Store, text: string, session?: Session): Promise<(Desc
   await proc.exited;
   clearTimeout(timer);
 
-  let result: { is_error?: boolean; structured_output?: { summary: string; features: Description["features"]; files: { path: string; what: string; why: string }[] } } | null = null;
+  let result: { is_error?: boolean; structured_output?: T } | null = null;
   try {
     result = JSON.parse(out);
   } catch {}
   const answer = result && !result.is_error ? result.structured_output : null;
+  if (!answer) store.log(`claude ${session ? `fork of ${session.id}` : "run"} failed: ${(err || out).trim().slice(0, 400)}`);
+  return answer ?? null;
+}
+
+type Answer = { summary: string; features: Description["features"]; files: { path: string; what: string; why: string }[] };
+
+async function ask(store: Store, text: string, session?: Session): Promise<(Description & { by: "session" | "diff"; session?: string }) | null> {
+  const answer = await claude<Answer>(store, text, SCHEMA, session);
   if (!answer) {
-    store.log(`claude ${session ? `fork of ${session.id}` : "run"} failed: ${(err || out).trim().slice(0, 400)}`);
     return session ? ask(store, text.replace(/^You are a fork[^\n]*\n/m, "Work from the diff. Where the reason isn't clear from it, say what the change does rather than guess at why.\n"), undefined) : null;
   }
   return {
@@ -146,6 +161,80 @@ async function ask(store: Store, text: string, session?: Session): Promise<(Desc
     by: session ? "session" : "diff",
     ...(session ? { session: session.id } : {}),
   };
+}
+
+// ---------------------------------------------------------------- purposes
+//
+// What each module is for, in one sentence, for the modules that don't open
+// with a comment saying so. Written from the module's own code and its place in
+// the graph, a batch of modules per run, by a fresh run: what a file does needs
+// no session. Each sentence is kept with the hash of the file it was written
+// for (store.ts, purposes.json), so only new or changed files are done again.
+
+const PURPOSE_SCHEMA = {
+  type: "object",
+  required: ["modules"],
+  properties: {
+    modules: {
+      type: "array",
+      items: { type: "object", required: ["id", "purpose"], properties: { id: { type: "string" }, purpose: { type: "string" } } },
+    },
+  },
+};
+const PURPOSE_BATCH = 12;
+const PURPOSE_LINES = 200;
+
+export type Purposes = Record<string, { hash: string; text: string }>;
+
+async function explainPurposes(store: Store) {
+  if (!store.claim("purposes")) return;
+  try {
+    const graph = liveGraph(store.repo.project);
+    const known = store.read<Purposes>("purposes.json", {});
+    const missing = graph.nodes.filter((n) => n.kind === "script" && !n.external && !n.doc && n.file && known[n.id]?.hash !== n.hash);
+    const label = (id: string) => id.split("/").join(".");
+    const names = (ids: string[]) => ids.map((id) => id.split("/").at(-1)).join(", ") || "nothing";
+
+    for (let at = 0; at < missing.length; at += PURPOSE_BATCH) {
+      const batch = missing.slice(at, at + PURPOSE_BATCH);
+      const sections = batch.map((n) => {
+        const lines = readFileSync(join(store.repo.project, n.file!), "utf8").split("\n");
+        const code = lines.slice(0, PURPOSE_LINES).join("\n") + (lines.length > PURPOSE_LINES ? `\n-- … ${lines.length - PURPOSE_LINES} more lines` : "");
+        const requires = graph.edges.filter((e) => e.source === n.id && e.kind === "require").map((e) => e.target);
+        const requiredBy = graph.edges.filter((e) => e.target === n.id && e.kind === "require").map((e) => e.source);
+        return `### ${n.id}  (${label(n.id)}, a ${n.className})\nrequires: ${names(requires)}\nrequired by: ${names(requiredBy)}\n\`\`\`lua\n${code}\n\`\`\``;
+      });
+      const answer = await claude<{ modules: { id: string; purpose: string }[] }>(
+        store,
+        `codegraph, a map of this Roblox game's code, needs one sentence per module saying what it does, for someone who knows the game but not this file.
+
+Say what the module is for in the game, in plain words and under 25 words, not how it is written. No file paths. Answer for every module below, with its id exactly as given after ###.
+
+${sections.join("\n\n")}`,
+        PURPOSE_SCHEMA,
+      );
+      if (!answer) continue;
+      // The model may give the id dotted, the way it's also shown, or as the
+      // bare name; either is matched back to the module it means.
+      const match = (id: string) => {
+        const slashed = id.trim().replace(/\./g, "/");
+        return batch.find((n) => n.id === slashed) ?? batch.filter((n) => n.id.split("/").at(-1) === slashed.split("/").at(-1)).at(0);
+      };
+      store.lock("purposes", () => {
+        const purposes = store.read<Purposes>("purposes.json", {});
+        for (const m of answer.modules) {
+          const n = match(m.id);
+          if (n) purposes[n.id] = { hash: n.hash!, text: m.purpose };
+        }
+        store.write("purposes.json", purposes);
+      });
+      const matched = new Set(answer.modules.map((m) => match(m.id)?.id));
+      const unmatched = batch.filter((n) => !matched.has(n.id));
+      if (unmatched.length) store.log(`purposes: no answer for ${unmatched.map((n) => n.id).join(", ")}; got ids ${answer.modules.map((m) => m.id).join(", ")}`);
+    }
+  } finally {
+    store.release("purposes");
+  }
 }
 
 async function explainCommit(store: Store, ref: string, session?: Session) {
@@ -230,8 +319,10 @@ if (import.meta.main) {
       await explainCommit(store, ref, id ? { id, cwd: flag("--cwd") ?? project } : undefined);
     } else if (mode === "worktree") {
       await explainWorktree(store);
+    } else if (mode === "purposes") {
+      await explainPurposes(store);
     } else {
-      console.error("usage: explain.ts <project> commit <hash> [--session <id> --cwd <dir>] | worktree");
+      console.error("usage: explain.ts <project> commit <hash> [--session <id> --cwd <dir>] | worktree | purposes");
       process.exit(2);
     }
   } catch (error) {

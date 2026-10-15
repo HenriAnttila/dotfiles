@@ -314,7 +314,9 @@ async function reloadGraph() {
       if ((node.data("parent") ?? null) !== (n.parent ?? null)) node.move({ parent: n.parent ?? null });
     }
     cy.add(next.filter((e) => e.group === "edges"));
+    for (const n of graph.nodes) cy.getElementById(n.id).data({ file: n.file ?? null, doc: n.doc ?? null, purpose: n.purpose ?? null });
   });
+  askForPurposes();
   const fresh = leaves().filter((n) => !placed.has(n.id()));
   if (fresh.nonempty()) {
     fresh.forEach((n) => n.position(nearSiblings(n, placed)));
@@ -649,6 +651,52 @@ function refList(title, items) {
   return `<h3>${title} (${items.length})</h3><ul class="refs">${rows}</ul>`;
 }
 
+// ---------------------------------------------------------------- what a module does
+//
+// From the comment the file opens with when it has one, otherwise the sentence
+// explain.ts wrote from its code. Modules with neither get one asked for.
+
+const paragraphs = (text) => text.split(/\n\s*\n/);
+const oneLine = (text) => text.replace(/\s*\n\s*/g, " ").trim();
+
+function about(d) {
+  if (d.doc) return { text: oneLine(paragraphs(d.doc)[0]), more: paragraphs(d.doc).slice(1).join("\n\n"), by: "comment" };
+  if (d.purpose) return { text: d.purpose, more: "", by: "ai" };
+  return null;
+}
+
+function aboutHtml(d) {
+  const a = about(d);
+  if (!a) return d.kind === "script" && !d.external ? `<p class="by about-missing">No description yet.</p>` : "";
+  return `<div class="about"><p>${esc(a.text)}</p>
+    ${a.more ? `<details><summary>More from the file's comment</summary><pre>${esc(a.more)}</pre></details>` : ""}
+    ${a.by === "ai" ? `<p class="by">Written by AI from the code</p>` : ""}</div>`;
+}
+
+function askForPurposes() {
+  const missing = cy.nodes().some((n) => n.data("kind") === "script" && !n.data("external") && !n.data("doc") && !n.data("purpose"));
+  if (missing) api("/api/purposes", { method: "POST" }).catch(() => {});
+}
+
+function showTip(node) {
+  const tip = $("tip");
+  const a = about(node.data());
+  if (!a) return hideTip();
+  const first = a.text.match(/^.*?[.!?](\s|$)/)?.[0] ?? a.text;
+  tip.innerHTML = `<b>${esc(node.data("label"))}</b><span>${esc(first.length > 220 ? `${first.slice(0, 217)}…` : first)}</span>`;
+  const box = node.renderedBoundingBox();
+  const area = $("graph").getBoundingClientRect();
+  tip.hidden = false;
+  const left = Math.min(box.x1, area.width - tip.offsetWidth - 8);
+  const below = box.y2 + 8;
+  tip.style.left = `${Math.max(8, left)}px`;
+  tip.style.top = `${below + tip.offsetHeight > area.height ? box.y1 - tip.offsetHeight - 8 : below}px`;
+}
+
+function hideTip() {
+  $("tip").hidden = true;
+}
+
 function backLabel() {
   if (!state.change) return "Back";
   return state.change.ref === WORKTREE ? "Uncommitted changes" : state.change.commit.short;
@@ -660,7 +708,8 @@ function renderNode(body, node) {
   let html = `<button class="back" data-back>← ${esc(backLabel())}</button>
     <h2>${esc(d.label)}</h2>
     <div class="meta">${esc(d.className)} · ${esc(instancePath(d.id))}</div>
-    ${d.file ? `<div class="meta">${esc(d.file)}</div>` : ""}`;
+    ${d.file ? `<div class="meta">${esc(d.file)}</div>` : ""}
+    ${aboutHtml(d)}`;
 
   if (f) {
     html += `<h3>In this change &nbsp;<span class="status ${f.status}">${f.status}</span> ${f.binary ? "" : counts(f.additions, f.deletions)}</h3>
@@ -758,6 +807,9 @@ function wire() {
     if (e.target === cy) clearSelection();
   });
   cy.on("dragfree", "node", savePositions);
+  cy.on("mouseover", "node", (e) => showTip(e.target));
+  cy.on("mouseout", "node", hideTip);
+  cy.on("viewport tapstart", hideTip);
 
   $("older").onclick = () => step(1);
   $("newer").onclick = () => step(-1);
@@ -904,6 +956,7 @@ async function main() {
   });
   place(saved);
   focusChange(false);
+  askForPurposes();
   wire();
 
   await loadMore();

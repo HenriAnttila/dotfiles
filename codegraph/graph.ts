@@ -47,6 +47,14 @@ export type GraphNode = {
   kind: "script" | "folder";
   file?: string;
   external: boolean;
+  // The comment the script opens with, when it explains the module.
+  doc?: string;
+  // The file's contents as a short hash, so a description written for one
+  // version of it can tell when it's out of date.
+  hash?: string;
+  // A one-sentence description written for a script with no `doc`; the server
+  // adds it from the store, the parser never does.
+  purpose?: string;
 };
 
 export type GraphEdge = {
@@ -125,6 +133,33 @@ function stripComments(source: string): string {
     }
   }
   return out;
+}
+
+// The comment a script opens with: a --[[ ]] block, or a run of -- lines before
+// the first line of code. Luau directives (--!strict) are skipped. Indentation
+// common to the comment's lines is removed and the rest kept, so an example
+// inside it still reads as code. Anything shorter than a sentence doesn't count.
+export function headerComment(source: string): string | null {
+  const lines = source.split("\n");
+  let i = 0;
+  while (i < lines.length && /^\s*(--!.*)?$/.test(lines[i])) i++;
+  const block = lines.slice(i).join("\n").match(/^\s*--\[(=*)\[([\s\S]*?)\]\1\]/);
+  let body: string[];
+  if (block) {
+    // A block closed as --]] leaves its -- behind as the last line.
+    body = block[2].replace(/--\s*$/, "").split("\n");
+  } else {
+    body = [];
+    for (const line of lines.slice(i)) {
+      const m = line.match(/^\s*--(?!\[=*\[)(.*)$/);
+      if (!m) break;
+      body.push(m[1]);
+    }
+  }
+  const indents = body.filter((l) => l.trim()).map((l) => l.match(/^\s*/)![0].length);
+  const cut = indents.length ? Math.min(...indents) : 0;
+  const text = body.map((l) => l.slice(cut).trimEnd()).join("\n").trim();
+  return text.length > 20 ? text : null;
 }
 
 type Value =
@@ -336,7 +371,13 @@ export function buildGraph(root: string, sourcemapFile = join(root, "sourcemap.j
     });
     if (!file || !isScript(i) || i.path[1] === "Packages") continue;
 
-    const scanner = new Scanner(stripComments(readFileSync(join(root, file), "utf8")), i, resolveModule);
+    const source = readFileSync(join(root, file), "utf8");
+    const node = nodes.at(-1)!;
+    const doc = headerComment(source);
+    if (doc) node.doc = doc;
+    node.hash = Bun.hash(source).toString(36);
+
+    const scanner = new Scanner(stripComments(source), i, resolveModule);
     for (const r of scanner.requires()) {
       if (r.target) addEdge(key, r.target, "require");
       else unresolved.push({ file, expression: r.expression });

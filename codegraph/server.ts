@@ -67,26 +67,27 @@ const broadcast = (event: object) => {
 // moment and the page hears about them once. Git counts as changed only when
 // HEAD or the status output differs from last time, so a save that git ignores
 // does not make the page reload a change.
-let pending = { graph: false, git: false, explanations: false };
+let pending = { graph: false, git: false, explanations: false, purposes: false };
 let timer: Timer | null = null;
 let last = { head: repo.head(), status: repo.status() };
 
 const flush = () => {
   timer = null;
-  const event = { graph: pending.graph, head: false, worktree: false, explanations: pending.explanations };
+  const event = { graph: pending.graph || pending.purposes, head: false, worktree: false, explanations: pending.explanations };
   if (pending.git) {
     const now = { head: repo.head(), status: repo.status() };
     event.head = now.head !== last.head;
     event.worktree = event.head || now.status !== last.status;
     last = now;
   }
-  pending = { graph: false, git: false, explanations: false };
+  pending = { graph: false, git: false, explanations: false, purposes: false };
   if (event.graph || event.head || event.worktree || event.explanations) broadcast(event);
 };
 
 const changed = (file: string, inGitDir: boolean) => {
   if (inGitDir) {
-    if (/^(refs\/notes\/|codegraph\/(worktree\.json|jobs\/))/.test(file)) pending.explanations = true;
+    if (/^codegraph\/purposes\.json/.test(file)) pending.purposes = true;
+    else if (/^(refs\/notes\/|codegraph\/(worktree\.json|jobs\/))/.test(file)) pending.explanations = true;
     else if (/^(HEAD|index|packed-refs|refs\/)/.test(file)) pending.git = true;
     else return;
   } else {
@@ -131,7 +132,12 @@ const tried = new Set<string>();
 function explain(ref: string): boolean {
   if (store.running(ref)) return false;
   let key = ref;
-  if (ref === WORKTREE) {
+  if (ref === "purposes") {
+    const purposes = store.read<Record<string, { hash: string }>>("purposes.json", {});
+    const missing = liveGraph(project).nodes.filter((n) => n.kind === "script" && !n.external && !n.doc && purposes[n.id]?.hash !== n.hash);
+    if (!missing.length) return false;
+    key = `purposes:${missing.map((n) => `${n.id}:${n.hash}`).sort().join("|")}`;
+  } else if (ref === WORKTREE) {
     const prints = store.fingerprints();
     const waiting = store.worktree(prints).pending;
     if (!waiting.length) return false;
@@ -141,7 +147,8 @@ function explain(ref: string): boolean {
   }
   if (tried.has(key)) return false;
   tried.add(key);
-  spawn(process.execPath, [join(here, "explain.ts"), project, ref === WORKTREE ? "worktree" : "commit", ...(ref === WORKTREE ? [] : [ref])], {
+  const mode = ref === WORKTREE || ref === "purposes" ? [ref === WORKTREE ? "worktree" : "purposes"] : ["commit", ref];
+  spawn(process.execPath, [join(here, "explain.ts"), project, ...mode], {
     detached: true,
     stdio: "ignore",
   }).unref();
@@ -154,7 +161,22 @@ const routes: Record<string, (url: URL, req: Request) => Response | Promise<Resp
   "/style.css": () => new Response(Bun.file(join(here, "style.css"))),
   "/theme.css": () => new Response(themeCss(), { headers: { "content-type": "text/css", "cache-control": "no-store" } }),
 
-  "/api/graph": () => json({ project: basename(project), ...liveGraph(project) }),
+  // Each script that doesn't open with a comment gets the sentence explain.ts
+  // wrote for it, while that sentence still matches the file.
+  "/api/graph": () => {
+    const graph = liveGraph(project);
+    const purposes = store.read<Record<string, { hash: string; text: string }>>("purposes.json", {});
+    for (const n of graph.nodes) {
+      const p = purposes[n.id];
+      if (!n.doc && p && p.hash === n.hash) n.purpose = p.text;
+    }
+    return json({ project: basename(project), ...graph });
+  },
+
+  "/api/purposes": (_, req) => {
+    if (req.method !== "POST") return json({ error: "POST to start" }, 400);
+    return json({ started: explain("purposes") });
+  },
 
   "/api/commits": (url) => {
     const skip = Number(url.searchParams.get("skip") ?? 0);
