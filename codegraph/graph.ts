@@ -286,8 +286,10 @@ function remoteName(value: Value, listens: string | undefined): string | null {
   return parts.length ? parts.join(".") : null;
 }
 
-export function buildGraph(root: string): Graph {
-  const sourcemap: SourcemapNode = JSON.parse(readFileSync(join(root, "sourcemap.json"), "utf8"));
+// `sourcemapFile` defaults to the project's own sourcemap.json; structure.ts
+// passes one Rojo has just written, since the committed one is often stale.
+export function buildGraph(root: string, sourcemapFile = join(root, "sourcemap.json")): Graph {
+  const sourcemap: SourcemapNode = JSON.parse(readFileSync(sourcemapFile, "utf8"));
   const { byKey } = index(sourcemap);
 
   const included = new Set<string>();

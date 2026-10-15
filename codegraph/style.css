@@ -280,6 +280,32 @@ body.wide { --panel-w: 72%; }
 
 .empty { color: var(--muted); font-style: italic; }
 
+.summary { margin: 12px 0 2px; color: var(--text); }
+.by { margin: 2px 0 0; font-size: 11px; color: var(--muted); }
+.status-line { margin: 12px 0 0; color: var(--accent); font-size: 12px; }
+.status-line::before { content: "◌ "; display: inline-block; animation: spin 1.2s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.feature { margin-top: 18px; padding-left: 10px; border-left: 2px solid var(--line); }
+.feature h3 { margin: 0 0 2px; color: var(--accent); text-transform: none; letter-spacing: 0; font-size: 13px; }
+.feature .description { margin: 0 0 6px; color: var(--text); }
+
+.structure { list-style: none; margin: 0; padding: 0; font-size: 12px; }
+.structure li { display: grid; grid-template-columns: 14px 1fr; gap: 6px; padding: 2px 6px; border-radius: 5px; }
+.structure li[data-node] { cursor: pointer; }
+.structure li[data-node]:hover { background: var(--raised); }
+.structure .sign { font-weight: 700; }
+.structure .added .sign { color: var(--added); }
+.structure .removed .sign { color: var(--deleted); }
+.structure .verb { color: var(--muted); }
+.structure .where { color: var(--muted); }
+
+.note { margin: 8px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; padding: 8px 10px; border-left: 2px solid var(--accent); background: var(--raised); border-radius: 0 6px 6px 0; }
+.note dt { color: var(--accent); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding-top: 2px; }
+.note dd { margin: 0; }
+
+.commit .described { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 8px; vertical-align: middle; }
+
 .diff { margin-top: 12px; min-width: 0; }
 .diff .d2h-files-diff, .diff .d2h-file-diff { overflow-x: auto; }
 .diff .d2h-file-header { display: none; }

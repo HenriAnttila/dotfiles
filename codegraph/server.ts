@@ -16,13 +16,19 @@
 // Colours and font come from Ghostty and tmux (theme.ts), and follow a theme
 // pick while the page is open.
 //
+// Descriptions of changes (explain.ts, kept by store.ts) are written when the
+// page shows a change that has none, and after Claude commits (hook.ts). The
+// page hears when one lands.
+//
 // Node positions are kept in .git/codegraph/layout.json in the project's
 // repository, so the map stays the same between runs and never gets committed.
 
+import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, watch, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
-import { buildGraph } from "./graph.ts";
 import { Repo, WORKTREE } from "./git.ts";
+import { Store } from "./store.ts";
+import { liveGraph, structure } from "./structure.ts";
 import { GHOSTTY_DIR, themeCss } from "./theme.ts";
 
 let project = process.cwd();
@@ -40,6 +46,7 @@ if (!existsSync(join(project, "sourcemap.json"))) {
 }
 
 const repo = new Repo(project);
+const store = new Store(repo);
 const here = import.meta.dir;
 const layoutFile = join(repo.gitDir, "codegraph", "layout.json");
 
@@ -60,27 +67,28 @@ const broadcast = (event: object) => {
 // moment and the page hears about them once. Git counts as changed only when
 // HEAD or the status output differs from last time, so a save that git ignores
 // does not make the page reload a change.
-let pending = { graph: false, git: false };
+let pending = { graph: false, git: false, explanations: false };
 let timer: Timer | null = null;
 let last = { head: repo.head(), status: repo.status() };
 
 const flush = () => {
   timer = null;
-  const event = { graph: pending.graph, head: false, worktree: false };
+  const event = { graph: pending.graph, head: false, worktree: false, explanations: pending.explanations };
   if (pending.git) {
     const now = { head: repo.head(), status: repo.status() };
     event.head = now.head !== last.head;
     event.worktree = event.head || now.status !== last.status;
     last = now;
   }
-  pending = { graph: false, git: false };
-  if (event.graph || event.head || event.worktree) broadcast(event);
+  pending = { graph: false, git: false, explanations: false };
+  if (event.graph || event.head || event.worktree || event.explanations) broadcast(event);
 };
 
 const changed = (file: string, inGitDir: boolean) => {
   if (inGitDir) {
-    if (!/^(HEAD|index|packed-refs|refs\/)/.test(file)) return;
-    pending.git = true;
+    if (/^(refs\/notes\/|codegraph\/(worktree\.json|jobs\/))/.test(file)) pending.explanations = true;
+    else if (/^(HEAD|index|packed-refs|refs\/)/.test(file)) pending.git = true;
+    else return;
   } else {
     if (file === "sourcemap.json" || /\.luau?$/.test(file)) pending.graph = true;
     pending.git = true;
@@ -110,18 +118,50 @@ if (existsSync(GHOSTTY_DIR)) {
 
 const json = (data: unknown, status = 200) => Response.json(data, { status });
 
+const refFrom = (url: URL): string | null => {
+  const ref = url.searchParams.get("ref") ?? WORKTREE;
+  return ref === WORKTREE ? ref : (repo.commit(ref)?.hash ?? null);
+};
+
+// The page asks for a description when it shows a change that has none. Each
+// one is tried once per run of the server: a commit by its hash, the
+// uncommitted work by the files and diffs still waiting, so a description that
+// fails is not retried in a loop, but new uncommitted changes are.
+const tried = new Set<string>();
+function explain(ref: string): boolean {
+  if (store.running(ref)) return false;
+  let key = ref;
+  if (ref === WORKTREE) {
+    const prints = store.fingerprints();
+    const waiting = store.worktree(prints).pending;
+    if (!waiting.length) return false;
+    key = waiting.map((p) => `${p}:${prints[p]}`).sort().join("|");
+  } else if (store.note(ref)) {
+    return false;
+  }
+  if (tried.has(key)) return false;
+  tried.add(key);
+  spawn(process.execPath, [join(here, "explain.ts"), project, ref === WORKTREE ? "worktree" : "commit", ...(ref === WORKTREE ? [] : [ref])], {
+    detached: true,
+    stdio: "ignore",
+  }).unref();
+  return true;
+}
+
 const routes: Record<string, (url: URL, req: Request) => Response | Promise<Response>> = {
   "/": () => new Response(Bun.file(join(here, "index.html"))),
   "/app.js": () => new Response(Bun.file(join(here, "app.js"))),
   "/style.css": () => new Response(Bun.file(join(here, "style.css"))),
   "/theme.css": () => new Response(themeCss(), { headers: { "content-type": "text/css", "cache-control": "no-store" } }),
 
-  "/api/graph": () => json({ project: basename(project), ...buildGraph(project) }),
+  "/api/graph": () => json({ project: basename(project), ...liveGraph(project) }),
 
   "/api/commits": (url) => {
     const skip = Number(url.searchParams.get("skip") ?? 0);
     const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 500);
-    return json({ dirty: repo.status() !== "", commits: repo.commits(skip, limit) });
+    const noted = store.noted();
+    const commits = repo.commits(skip, limit).map((c) => ({ ...c, explained: noted.has(c.hash) }));
+    return json({ dirty: repo.status() !== "", commits });
   },
 
   "/api/change": (url) => {
@@ -137,6 +177,27 @@ const routes: Record<string, (url: URL, req: Request) => Response | Promise<Resp
     const path = url.searchParams.get("path");
     if (!path || (ref !== WORKTREE && !repo.commit(ref))) return new Response("", { status: 400 });
     return new Response(repo.diff(ref, path, url.searchParams.get("old") ?? undefined));
+  },
+
+  "/api/structure": (url) => {
+    const ref = refFrom(url);
+    return ref ? json(structure(repo, ref)) : json({ error: "no such change" }, 404);
+  },
+
+  // A commit's git note, or the uncommitted work as described so far, with the
+  // files still waiting. `running` while a description is being written.
+  "/api/explanation": (url) => {
+    const ref = refFrom(url);
+    if (!ref) return json({ error: "no such change" }, 404);
+    if (ref === WORKTREE) return json({ ...store.worktree(), running: store.running(WORKTREE) });
+    const note = store.note(ref);
+    return json({ ...(note ?? { features: [], files: {} }), pending: note ? [] : null, running: store.running(ref) });
+  },
+
+  "/api/explain": (url, req) => {
+    const ref = refFrom(url);
+    if (req.method !== "POST" || !ref) return json({ error: "POST a change" }, 400);
+    return json({ started: explain(ref) });
   },
 
   "/api/layout": async (_, req) => {

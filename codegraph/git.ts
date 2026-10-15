@@ -36,7 +36,7 @@ export const WORKTREE = "worktree";
 export class Repo {
   readonly top: string;
   readonly gitDir: string;
-  private prefix: string;
+  readonly prefix: string;
 
   constructor(readonly project: string) {
     this.top = this.run(["rev-parse", "--show-toplevel"]).trim();

@@ -36,6 +36,8 @@ const state = {
   change: null,
   selected: null,
   file: null,
+  structure: null,
+  explanation: null,
   links: "selected",
 };
 
@@ -332,19 +334,74 @@ function applyChange() {
   showLinks();
 }
 
-async function selectChange(ref) {
+async function selectChange(ref, { fromEvent = false } = {}) {
   const token = ++changeToken;
   state.ref = ref;
   const data = await (await api(`/api/change?ref=${encodeURIComponent(ref)}`)).json();
   if (token !== changeToken) return;
+  const same = state.change?.ref === data.ref;
   state.change = data;
   state.ref = data.ref;
   state.follow = state.ref === currentRef();
+  if (!same) {
+    state.structure = null;
+    state.explanation = null;
+  }
   if (state.file && !state.change.files.some((f) => f.path === state.file.path)) state.file = null;
   applyChange();
   renderHeader();
   renderPanel();
   if (!$("commits").hidden) renderCommits();
+  loadDescription({ fromEvent });
+}
+
+// ---------------------------------------------------------------- descriptions
+//
+// The structure of a change is worked out by the server; the description is
+// written by explain.ts. A change with no description gets one asked for: a
+// commit after it has been on screen for a moment, so stepping through history
+// doesn't start one per commit; the uncommitted work right away when the page
+// opens, and once edits have paused for a while after that.
+
+let explainTimer = null;
+
+async function loadDescription({ fromEvent = false, structure = true } = {}) {
+  const ref = state.change?.ref;
+  if (!ref) return;
+  const q = `ref=${encodeURIComponent(ref)}`;
+  const [shape, explanation] = await Promise.all([
+    structure ? api(`/api/structure?${q}`).then((r) => r.json()) : state.structure,
+    api(`/api/explanation?${q}`).then((r) => r.json()),
+  ]);
+  if (state.change?.ref !== ref) return;
+  state.structure = shape;
+  state.explanation = explanation;
+  renderDescription();
+  askForDescription(ref, fromEvent);
+}
+
+function askForDescription(ref, fromEvent) {
+  clearTimeout(explainTimer);
+  const e = state.explanation;
+  const missing = ref === WORKTREE ? e.pending.length > 0 : !e.summary;
+  if (!missing || e.running) return;
+  const delay = ref !== WORKTREE ? 1500 : fromEvent ? 20000 : 0;
+  explainTimer = setTimeout(async () => {
+    if (state.change?.ref !== ref) return;
+    const { started } = await (await api(`/api/explain?ref=${encodeURIComponent(ref)}`, { method: "POST" })).json();
+    if (started && state.change?.ref === ref) {
+      state.explanation = { ...state.explanation, running: true };
+      renderDescription();
+    }
+  }, delay);
+}
+
+// The summary view is all description, so it is drawn again; a module or file
+// view only has its note replaced, which leaves its diff alone.
+function renderDescription() {
+  const note = $("note");
+  if (note) note.innerHTML = noteHtml(note.dataset.path);
+  else if (!state.selected && !state.file) renderPanel();
 }
 
 let loading = null;
@@ -369,7 +426,7 @@ async function refreshGit() {
   state.commits = data.commits;
   state.dirty = data.dirty;
   state.exhausted = data.commits.length < limit;
-  if (state.follow || state.ref === WORKTREE) await selectChange(state.follow ? currentRef() : WORKTREE);
+  if (state.follow || state.ref === WORKTREE) await selectChange(state.follow ? currentRef() : WORKTREE, { fromEvent: true });
   else renderHeader();
   if (!$("commits").hidden) renderCommits();
 }
@@ -456,7 +513,7 @@ function renderCommits() {
   }
   for (const c of state.commits) {
     rows.push(
-      `<button class="commit ${state.ref === c.hash ? "current" : ""}" data-ref="${c.hash}"><span class="hash">${esc(c.short)}</span><span class="subject">${esc(c.subject)}</span><span class="when">${ago(c.date)}</span></button>`,
+      `<button class="commit ${state.ref === c.hash ? "current" : ""}" data-ref="${c.hash}"><span class="hash">${esc(c.short)}</span><span class="subject">${c.explained ? `<i class="described" title="Has a description"></i>` : ""}${esc(c.subject)}</span><span class="when">${ago(c.date)}</span></button>`,
     );
   }
   rows.push(`<div class="more">${state.exhausted ? "That's every commit." : "Scroll for older commits"}</div>`);
@@ -497,13 +554,66 @@ function renderSummary(body) {
     c.ref === WORKTREE
       ? `<h2>Uncommitted changes</h2><div class="meta">${c.files.length} files changed against HEAD</div>`
       : `<h2>${esc(c.commit.subject)}</h2><div class="meta">${esc(c.commit.short)} · ${esc(c.commit.author)} · ${new Date(c.commit.date).toLocaleString()}</div>`;
-  const inside = c.files.filter((f) => nodeFor(f) && cy.getElementById(nodeFor(f)).nonempty());
-  const outside = c.files.filter((f) => !inside.includes(f));
+  const e = state.explanation;
   let html = head;
+  if (e?.summary) html += `<p class="summary">${esc(e.summary)}</p>${byLine(e)}`;
+  else if (e?.running) html += `<p class="status-line">Describing this change…</p>`;
   if (!c.files.length) html += `<p class="empty">${c.ref === WORKTREE ? "Nothing uncommitted." : "This commit changed no files."}</p>`;
-  if (inside.length) html += `<h3>In the game</h3><ul class="files">${inside.map(fileRow).join("")}</ul>`;
-  if (outside.length) html += `<h3>Outside the game tree</h3><ul class="files">${outside.map(fileRow).join("")}</ul>`;
+  html += structureHtml(state.structure);
+
+  // Files under the feature they were grouped into; whatever no feature claims
+  // (not described yet, or left out by the description) under where it lives.
+  const grouped = new Set();
+  for (const feature of e?.features ?? []) {
+    const files = c.files.filter((f) => feature.files.includes(f.path) && !grouped.has(f.path));
+    if (!files.length) continue;
+    files.forEach((f) => grouped.add(f.path));
+    html += `<section class="feature"><h3>${esc(feature.name)}</h3><p class="description">${esc(feature.description)}</p><ul class="files">${files.map(fileRow).join("")}</ul></section>`;
+  }
+  const rest = c.files.filter((f) => !grouped.has(f.path));
+  const label = grouped.size ? (c.ref === WORKTREE && e?.running ? "Being described" : "Not described yet") : null;
+  const inside = rest.filter((f) => nodeFor(f) && cy.getElementById(nodeFor(f)).nonempty());
+  const outside = rest.filter((f) => !inside.includes(f));
+  if (label && rest.length) html += `<h3>${label}</h3><ul class="files">${rest.map(fileRow).join("")}</ul>`;
+  else {
+    if (inside.length) html += `<h3>In the game</h3><ul class="files">${inside.map(fileRow).join("")}</ul>`;
+    if (outside.length) html += `<h3>Outside the game tree</h3><ul class="files">${outside.map(fileRow).join("")}</ul>`;
+  }
   body.innerHTML = html;
+}
+
+const byLine = (e) =>
+  e.by ? `<p class="by">${e.by === "session" ? "Written by the session that made it" : "Written from the diff"}</p>` : "";
+
+const VERB = { require: "requires", starts: "starts", remote: "fires" };
+
+function structureHtml(s) {
+  if (!s) return "";
+  const label = (id) => esc(id.split("/").at(-1));
+  const rows = [
+    ...s.modules.added.map((m) => ({ sign: "+", node: m.id, text: `new module <b>${label(m.id)}</b> <span class="where">${esc(instancePath(m.parent ?? ""))}</span>` })),
+    ...s.modules.removed.map((m) => ({ sign: "−", text: `removed module <b>${label(m.id)}</b> <span class="where">${esc(instancePath(m.parent ?? ""))}</span>` })),
+    ...s.links.added.map((l) => ({ sign: "+", node: l.source, text: `${label(l.source)} <span class="verb">${VERB[l.kind]}</span> ${label(l.target)}${l.label ? ` <span class="where">${esc(l.label)}</span>` : ""}` })),
+    ...s.links.removed.map((l) => ({ sign: "−", node: l.source, text: `${label(l.source)} <span class="verb">no longer ${VERB[l.kind]}</span> ${label(l.target)}${l.label ? ` <span class="where">${esc(l.label)}</span>` : ""}` })),
+  ];
+  if (!rows.length) return `<h3>Structure</h3><p class="meta">No modules or links added or removed.</p>`;
+  const items = rows
+    .map((r) => `<li class="${r.sign === "+" ? "added" : "removed"}" ${r.node && cy.getElementById(r.node).nonempty() ? `data-node="${esc(r.node)}"` : ""}><span class="sign">${r.sign}</span><span>${r.text}</span></li>`)
+    .join("");
+  return `<h3>Structure</h3><ul class="structure">${items}</ul>`;
+}
+
+// What changed in one file and why, from the description of the change it's in.
+function noteHtml(path) {
+  const e = state.explanation;
+  const note = e?.files?.[path];
+  const feature = e?.features?.find((f) => f.files.includes(path));
+  if (note) {
+    return `${feature ? `<p class="by">Part of <b>${esc(feature.name)}</b></p>` : ""}
+      <dl class="note"><dt>What</dt><dd>${esc(note.what)}</dd><dt>Why</dt><dd>${esc(note.why)}</dd></dl>`;
+  }
+  if (e?.running) return `<p class="status-line">Describing this change…</p>`;
+  return "";
 }
 
 function refList(title, items) {
@@ -527,7 +637,10 @@ function renderNode(body, node) {
     <div class="meta">${esc(d.className)} · ${esc(instancePath(d.id))}</div>
     ${d.file ? `<div class="meta">${esc(d.file)}</div>` : ""}`;
 
-  if (f) html += `<h3>In this change &nbsp;<span class="status ${f.status}">${f.status}</span> ${f.binary ? "" : counts(f.additions, f.deletions)}</h3><div class="diff" id="diff"></div>`;
+  if (f) {
+    html += `<h3>In this change &nbsp;<span class="status ${f.status}">${f.status}</span> ${f.binary ? "" : counts(f.additions, f.deletions)}</h3>
+      <div id="note" data-path="${esc(f.path)}">${noteHtml(f.path)}</div><div class="diff" id="diff"></div>`;
+  }
 
   const changedInside = node.descendants(".A, .M, .D, .R");
   if (changedInside.nonempty()) {
@@ -556,6 +669,7 @@ function renderFile(body, f) {
     <h2>${esc(base)}</h2>
     <div class="meta">${esc(dir || ".")}${f.oldPath ? ` · was ${esc(f.oldPath)}` : ""}</div>
     <h3>In this change &nbsp;<span class="status ${f.status}">${f.status}</span> ${f.binary ? "" : counts(f.additions, f.deletions)}</h3>
+    <div id="note" data-path="${esc(f.path)}">${noteHtml(f.path)}</div>
     <div class="diff" id="diff"></div>`;
   drawDiff($("diff"), f);
 }
@@ -737,6 +851,12 @@ function listen() {
     const event = JSON.parse(message.data);
     if (event.theme) reloadTheme();
     if (event.graph) await reloadGraph();
+    if (event.explanations) {
+      await loadDescription({ fromEvent: true, structure: false });
+      const commit = state.commits.find((c) => c.hash === state.change?.ref);
+      if (commit && state.explanation?.summary) commit.explained = true;
+      if (!$("commits").hidden) renderCommits();
+    }
     if (event.head || event.worktree) await refreshGit();
   };
 }
