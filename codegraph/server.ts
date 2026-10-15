@@ -110,17 +110,17 @@ watch(project, { recursive: true }, (_, file) => {
 });
 if (!gitInProject) watch(repo.gitDir, { recursive: true }, (_, file) => file && changed(file.toString(), true));
 
-// Claude's trail: any transcript written to may be the session this project
-// follows, or a new one taking over, so each change is checked after a moment.
+// Claude's trail: when a transcript of a session that may be working on this
+// project is written to, the page is told after a moment and asks again for the
+// session it is showing.
 const follower = new Follower(project, store);
-follower.refresh();
 let claudeTimer: Timer | null = null;
 if (existsSync(PROJECTS)) {
   watch(PROJECTS, { recursive: true }, (_, file) => {
-    if (!file?.toString().endsWith(".jsonl")) return;
+    if (!file || !follower.concerns(join(PROJECTS, file.toString()))) return;
     claudeTimer ??= setTimeout(() => {
       claudeTimer = null;
-      if (follower.refresh()) broadcast({ claude: true });
+      broadcast({ claude: true });
     }, 200);
   });
 }
@@ -192,7 +192,7 @@ const routes: Record<string, (url: URL, req: Request) => Response | Promise<Resp
     return json({ project: basename(project), ...graph });
   },
 
-  "/api/claude": () => json(follower.trail),
+  "/api/claude": (url) => json(follower.view(url.searchParams.get("session"))),
 
   "/api/purposes": (_, req) => {
     if (req.method !== "POST") return json({ error: "POST to start" }, 400);

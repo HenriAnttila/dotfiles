@@ -1,37 +1,41 @@
-// Following Claude while it works, from the session's transcript: what it read
-// and what it edited in this project since your last prompt.
+// Following Claude while it works, from the sessions' transcripts: what each
+// session read and edited in this project since its last prompt.
 //
 // Claude Code appends every message to ~/.claude/projects/<dir>/<session>.jsonl
-// as it happens, tool calls included, so the transcript is read rather than
+// as it happens, tool calls included, so the transcripts are read rather than
 // asking hooks for anything. <dir> is the folder the session started in, with
 // every character that isn't a letter or digit turned into "-".
 //
-// The session followed is the one whose transcript was written to last, out of
-// the sessions started in the project and the ones hook.ts saw changing it
-// (sessions.json), which covers a session started somewhere else that works on
-// this project by path.
+// The sessions offered are the ones written to in the last day, out of those
+// started in the project and those hook.ts saw changing it (sessions.json),
+// which covers a session started somewhere else that works on this project by
+// path. The page picks which one to show; it starts on the most recent and
+// stays there until you pick another, so several sessions working at once
+// never make it jump. Each session's trail is kept separately, so two pages
+// can follow two sessions.
 //
 // A prompt you type (a "user" line from a human, not a tool result or a system
 // note) starts a new trail. Read marks a file read; Edit, MultiEdit, Write and
 // NotebookEdit mark it edited, the moment the call is made; an absolute path in
 // a Bash command marks a file read. Files outside the project are left out.
 //
-// The transcript is read from where it was last read up to its end each time it
-// changes; a new or switched transcript is read from its last few megabytes,
-// which is plenty to reach its last prompt.
+// A transcript is read from where it was last read up to its end each time it
+// is asked for; the first time, from its last few megabytes, which is plenty to
+// reach its last prompt.
 
 import { closeSync, existsSync, openSync, readdirSync, readSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, join, relative } from "node:path";
+import { basename, isAbsolute, join, relative } from "node:path";
 import type { Sessions, Store } from "./store.ts";
 
 export const PROJECTS = join(homedir(), ".claude", "projects");
 const slug = (dir: string) => dir.replace(/[^a-zA-Z0-9]/g, "-");
 const WINDOW = 8 * 1024 * 1024;
+const RECENT_MS = 24 * 60 * 60 * 1000;
 const EDITS = new Set(["Edit", "MultiEdit", "Write", "NotebookEdit"]);
 
 export type Trail = {
-  session: string | null;
+  session: string;
   prompt: string | null;
   promptAt: string | null;
   reads: string[];
@@ -43,7 +47,15 @@ export type Trail = {
   updatedAt: string | null;
 };
 
-const empty = (): Trail => ({ session: null, prompt: null, promptAt: null, reads: [], edits: [], latest: null, lastEdit: null, updatedAt: null });
+export type SessionInfo = {
+  id: string;
+  startedIn: string;
+  prompt: string | null;
+  updatedAt: string | null;
+  writtenAt: number;
+  edits: number;
+  reads: number;
+};
 
 type Line = {
   type?: string;
@@ -53,70 +65,41 @@ type Line = {
   message?: { content?: string | { type: string; text?: string; name?: string; input?: Record<string, unknown> }[] };
 };
 
-export class Follower {
-  private file: string | null = null;
-  private offset = 0;
+class Transcript {
+  private offset: number;
   private rest = "";
+  private skip: boolean;
   private reads = new Set<string>();
   private edits = new Set<string>();
-  trail: Trail = empty();
+  trail: Trail;
 
   constructor(
+    readonly file: string,
     private project: string,
-    private store: Store,
-  ) {}
-
-  private candidates(): string[] {
-    const files = new Set<string>();
-    const own = join(PROJECTS, slug(this.project));
-    if (existsSync(own)) for (const f of readdirSync(own)) if (f.endsWith(".jsonl")) files.add(join(own, f));
-    const sessions = this.store.read<Sessions>("sessions.json", { head: null, sessions: {}, files: {} }).sessions;
-    for (const [id, s] of Object.entries(sessions)) files.add(join(PROJECTS, slug(s.cwd), `${id}.jsonl`));
-    return [...files].filter((f) => existsSync(f));
-  }
-
-  // Whether a changed transcript could be one this project follows.
-  concerns(path: string): boolean {
-    return path.endsWith(".jsonl") && this.candidates().includes(path);
-  }
-
-  // Brings the trail up to date; true when it changed.
-  refresh(): boolean {
-    const latest = this.candidates()
-      .map((f) => ({ f, at: statSync(f).mtimeMs }))
-      .sort((a, b) => b.at - a.at)[0]?.f ?? null;
-    const before = JSON.stringify(this.trail);
-    if (latest !== this.file) {
-      this.file = latest;
-      this.reads.clear();
-      this.edits.clear();
-      this.trail = empty();
-      if (latest) {
-        const size = statSync(latest).size;
-        this.offset = Math.max(0, size - WINDOW);
-        this.rest = "";
-        this.readOn(this.offset > 0);
-      }
-    } else if (latest) {
-      this.readOn(false);
-    }
-    return JSON.stringify(this.trail) !== before;
-  }
-
-  private readOn(skipFirstLine: boolean) {
-    const file = this.file!;
+  ) {
     const size = statSync(file).size;
+    this.offset = Math.max(0, size - WINDOW);
+    this.skip = this.offset > 0;
+    this.trail = Transcript.empty(basename(file, ".jsonl"));
+  }
+
+  static empty(session: string): Trail {
+    return { session, prompt: null, promptAt: null, reads: [], edits: [], latest: null, lastEdit: null, updatedAt: null };
+  }
+
+  update() {
+    const size = statSync(this.file).size;
     if (size < this.offset) this.offset = 0;
     if (size === this.offset) return;
-    const fd = openSync(file, "r");
+    const fd = openSync(this.file, "r");
     const buffer = Buffer.alloc(size - this.offset);
     readSync(fd, buffer, 0, buffer.length, this.offset);
     closeSync(fd);
     this.offset = size;
     const lines = (this.rest + buffer.toString("utf8")).split("\n");
     this.rest = lines.pop() ?? "";
-    if (skipFirstLine) lines.shift();
-    this.trail.session = file.split("/").at(-1)!.replace(/\.jsonl$/, "");
+    if (this.skip) lines.shift();
+    this.skip = false;
     for (const line of lines) this.take(line);
   }
 
@@ -148,7 +131,7 @@ export class Follower {
       const prompt = typeof content === "string" ? content : (content ?? []).filter((c) => c.type === "text").map((c) => c.text).join(" ");
       this.reads.clear();
       this.edits.clear();
-      this.trail = { ...empty(), session: this.trail.session, prompt: prompt.trim().slice(0, 300), promptAt: at, updatedAt: at };
+      this.trail = { ...Transcript.empty(this.trail.session), prompt: prompt.trim().slice(0, 300), promptAt: at, updatedAt: at };
       return;
     }
     if (line.type !== "assistant" || !Array.isArray(content)) return;
@@ -161,5 +144,58 @@ export class Follower {
         for (const path of c.input.command.match(/\/[^\s'"`;&|()<>]+/g) ?? []) this.mark(this.inProject(path), "read", at);
       }
     }
+  }
+}
+
+export class Follower {
+  private transcripts = new Map<string, Transcript>();
+
+  constructor(
+    private project: string,
+    private store: Store,
+  ) {}
+
+  // Every transcript that could be working on this project, with where its
+  // session started.
+  private candidates(): Map<string, string> {
+    const found = new Map<string, string>();
+    const own = join(PROJECTS, slug(this.project));
+    if (existsSync(own)) for (const f of readdirSync(own)) if (f.endsWith(".jsonl")) found.set(join(own, f), this.project);
+    const sessions = this.store.read<Sessions>("sessions.json", { head: null, sessions: {}, files: {} }).sessions;
+    for (const [id, s] of Object.entries(sessions)) {
+      const file = join(PROJECTS, slug(s.cwd), `${id}.jsonl`);
+      if (existsSync(file)) found.set(file, s.cwd);
+    }
+    return found;
+  }
+
+  concerns(path: string): boolean {
+    return path.endsWith(".jsonl") && this.candidates().has(path);
+  }
+
+  // The sessions written to in the last day, newest first, each brought up to date.
+  sessions(): SessionInfo[] {
+    const now = Date.now();
+    const list: SessionInfo[] = [];
+    for (const [file, cwd] of this.candidates()) {
+      const writtenAt = statSync(file).mtimeMs;
+      if (now - writtenAt > RECENT_MS) continue;
+      let transcript = this.transcripts.get(file);
+      if (!transcript) this.transcripts.set(file, (transcript = new Transcript(file, this.project)));
+      transcript.update();
+      const t = transcript.trail;
+      list.push({ id: t.session, startedIn: cwd, prompt: t.prompt, updatedAt: t.updatedAt, writtenAt, edits: t.edits.length, reads: t.reads.length });
+    }
+    return list.sort((a, b) => b.writtenAt - a.writtenAt);
+  }
+
+  // The sessions on offer and the trail of the one asked for. Without one (or
+  // when it's no longer on offer): the most recent session that has read or
+  // edited something here since its prompt, else the most recent of all.
+  view(session: string | null): { sessions: SessionInfo[]; trail: Trail | null } {
+    const sessions = this.sessions();
+    const chosen = sessions.find((s) => s.id === session) ?? sessions.find((s) => s.edits + s.reads > 0) ?? sessions[0];
+    const transcript = chosen && [...this.transcripts.values()].find((t) => t.trail.session === chosen.id);
+    return { sessions, trail: transcript ? transcript.trail : null };
   }
 }

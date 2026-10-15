@@ -39,6 +39,8 @@ const state = {
   structure: null,
   explanation: null,
   claude: null,
+  sessions: [],
+  sessionId: null,
   trailOpen: false,
   links: "selected",
 };
@@ -146,7 +148,7 @@ const leaves = () => cy.nodes(":childless");
 
 // Bumped whenever node sizes change, so a layout saved for the old sizes is
 // laid out again instead of left overlapping.
-const LAYOUT_VERSION = 3;
+const LAYOUT_VERSION = 4;
 
 const savePositions = debounce(() => {
   const positions = {};
@@ -255,31 +257,14 @@ function relayout() {
   leaves().positions((n) => positions[n.id()]);
 }
 
-// A node without a saved position starts next to its saved siblings.
-function nearSiblings(node, placed) {
-  const siblings = node.parent().children(":childless").filter((s) => placed.has(s.id()));
-  if (siblings.empty()) return { x: Math.random() * 40, y: Math.random() * 40 };
-  const box = siblings.boundingBox();
-  return { x: box.x1 + node.data("w") / 2, y: box.y2 + GAP + NODE_H / 2 };
-}
-
 function place(saved) {
-  const placed = new Set(Object.keys(saved));
-  const missing = leaves().filter((n) => !placed.has(n.id()));
-  if (missing.length === leaves().length) {
+  const ids = leaves().map((n) => n.id());
+  if (ids.length !== Object.keys(saved).length || ids.some((id) => !saved[id])) {
     relayout();
     savePositions();
     return;
   }
-  leaves().forEach((n) => {
-    if (placed.has(n.id())) n.position(saved[n.id()]);
-  });
-  if (missing.empty()) return;
-  missing.forEach((n) => {
-    n.position(nearSiblings(n, placed));
-    placed.add(n.id());
-  });
-  savePositions();
+  leaves().forEach((n) => n.position(saved[n.id()]));
 }
 
 // The whole map when it can be read at that size; otherwise as close as it
@@ -321,9 +306,9 @@ async function reloadGraph() {
     for (const n of graph.nodes) cy.getElementById(n.id).data({ file: n.file ?? null, doc: n.doc ?? null, purpose: n.purpose ?? null });
   });
   askForPurposes();
-  const fresh = leaves().filter((n) => !placed.has(n.id()));
-  if (fresh.nonempty()) {
-    fresh.forEach((n) => n.position(nearSiblings(n, placed)));
+  const gone = [...placed].some((id) => cy.getElementById(id).empty());
+  if (gone || leaves().some((n) => !placed.has(n.id()))) {
+    relayout();
     savePositions();
   }
   if (state.selected && cy.getElementById(state.selected).empty()) state.selected = null;
@@ -665,11 +650,25 @@ function refList(title, items) {
 const WORKING_MS = 20000;
 let lastFlash = null;
 
+// The page sticks to one session: the one you picked, or the one the server
+// offered first, until you pick another.
 async function loadTrail() {
-  state.claude = await (await api("/api/claude")).json();
+  const view = await (await api(`/api/claude?session=${encodeURIComponent(state.sessionId ?? "")}`)).json();
+  state.sessions = view.sessions;
+  state.claude = view.trail;
+  if (view.trail && view.trail.session !== state.sessionId) {
+    if (state.sessionId) lastFlash = null;
+    state.sessionId = view.trail.session;
+  }
   applyTrail();
   renderChip();
   if (state.trailOpen) renderPanel();
+}
+
+function pickSession(id) {
+  state.sessionId = id;
+  lastFlash = null;
+  loadTrail();
 }
 
 function applyTrail() {
@@ -701,7 +700,8 @@ function flash(node) {
     .animate({ style: { "underlay-opacity": 0.38, "underlay-padding": 6 } }, { duration: 1400, complete: () => node.removeStyle("underlay-opacity underlay-padding") });
 }
 
-const working = () => state.claude?.updatedAt && Date.now() - new Date(state.claude.updatedAt).getTime() < WORKING_MS;
+const isWorking = (updatedAt) => !!updatedAt && Date.now() - new Date(updatedAt).getTime() < WORKING_MS;
+const working = () => isWorking(state.claude?.updatedAt);
 
 function renderChip() {
   const chip = $("claude");
@@ -709,7 +709,8 @@ function renderChip() {
   chip.hidden = !t?.prompt;
   if (chip.hidden) return;
   chip.classList.toggle("working", !!working());
-  $("claude-text").textContent = `Claude · ${t.edits.length} edited · ${t.reads.length} read`;
+  const more = state.sessions.length > 1 ? ` · 1 of ${state.sessions.length}` : "";
+  $("claude-text").textContent = `Claude · ${t.edits.length} edited · ${t.reads.length} read${more}`;
   chip.title = t.prompt;
 }
 
@@ -723,6 +724,22 @@ function trailRows(paths) {
     .join("");
 }
 
+function sessionsHtml() {
+  if (state.sessions.length < 2) return "";
+  const project = state.graph.project;
+  const rows = state.sessions
+    .map((s) => {
+      const where = s.startedIn.split("/").at(-1);
+      const meta = [`${s.edits} edited · ${s.reads} read`, ago(s.updatedAt ?? new Date(s.writtenAt).toISOString()), where !== project ? `started in ${where}` : ""].filter(Boolean).join(" · ");
+      return `<li data-session="${esc(s.id)}" class="${s.id === state.sessionId ? "current" : ""}">
+        <i class="dot ${isWorking(s.updatedAt) ? "working" : ""}"></i>
+        <span class="prompt-line">${esc(s.prompt ?? "(no prompt yet)")}</span>
+        <span class="meta">${esc(meta)}</span></li>`;
+    })
+    .join("");
+  return `<h3>Sessions (${state.sessions.length})</h3><ul class="sessions">${rows}</ul>`;
+}
+
 function renderTrail(body) {
   const t = state.claude;
   if (!t?.prompt) {
@@ -730,6 +747,7 @@ function renderTrail(body) {
     return;
   }
   body.innerHTML = `<button class="back" data-back>← ${esc(backLabel())}</button>
+    ${sessionsHtml()}
     <h2>Claude's trail</h2>
     <div class="meta">${working() ? "working now" : `last active ${ago(t.updatedAt)}`} · since your prompt ${ago(t.promptAt)}</div>
     <blockquote class="prompt">${esc(t.prompt)}</blockquote>
@@ -931,6 +949,8 @@ function wire() {
 
   $("panel-body").onclick = (e) => {
     if (e.target.closest("[data-back]")) return clearSelection();
+    const session = e.target.closest("[data-session]")?.dataset.session;
+    if (session) return pickSession(session);
     const nodeId = e.target.closest("[data-node]")?.dataset.node;
     if (nodeId) return selectNode(nodeId, { center: true });
     const path = e.target.closest("[data-path]")?.dataset.path;
@@ -1061,8 +1081,7 @@ async function main() {
   wire();
 
   await loadMore();
-  await selectChange(currentRef());
-  await loadTrail();
+  await Promise.all([selectChange(currentRef()), loadTrail()]);
   listen();
 }
 
