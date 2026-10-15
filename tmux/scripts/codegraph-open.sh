@@ -1,24 +1,25 @@
 #!/bin/sh
 # Open codegraph (~/dotfiles/codegraph) for the pane's project: the project as a
 # graph, with the current change lit up on it.
-# Usage: codegraph-open.sh [-w] <pane_id>    (from run-shell -b)
-#        codegraph-open.sh --run <project>   (inside the popup or window)
+# Usage: codegraph-open.sh [-w|-h|-v] <pane_id>   (from run-shell -b)
+#        codegraph-open.sh --run <project>       (inside the popup, window or split)
 #
 # Alt+o's entry opens it in a popup over the pane, Alt+n's (-w) in a new window
-# named codegraph.
+# named codegraph, Alt+Shift+I's (-h) in a split beside the pane, which is the
+# one to use for watching Claude work while you type to it.
 #
 # The project is the nearest folder at or above the pane's directory that has a
 # sourcemap.json, the file Rojo writes and codegraph reads.
 #
-# The server lives inside the popup or window (--run): it starts there, on the
-# first free port from 7420 up, and is stopped when terminal-browser exits, so
-# closing it (ctrl+q) leaves nothing running. It starts in well under a second,
-# so there is nothing worth keeping alive between looks.
+# The server lives inside the popup, window or split (--run): it starts there,
+# on the first free port from 7420 up, and is stopped when terminal-browser
+# exits, so closing it (ctrl+q) leaves nothing running. It starts in well under
+# a second, so there is nothing worth keeping alive between looks.
 #
 # A popup's command goes through the tmux skill's popup.py --inside, which fills
 # in the popup's size in pixels before terminal-browser starts. tmux leaves a
 # popup's at 0, and terminal-browser renders the page at the wrong scale without
-# it. A window is an ordinary pane and needs no help.
+# it. A window or split is an ordinary pane and needs no help.
 #
 # The first stage runs from run-shell -b, so tmux is not held up while a popup
 # is open, and every way out of it is exit 0 with nothing printed: run-shell
@@ -53,11 +54,13 @@ if [ "$1" = "--run" ]; then
   exit 0
 fi
 
-window=
-if [ "$1" = "-w" ]; then
-  window=1
-  shift
-fi
+mode=popup
+case "$1" in
+  -w | -h | -v)
+    mode="$1"
+    shift
+    ;;
+esac
 pane="$1"
 exec >/dev/null 2>&1
 
@@ -72,8 +75,10 @@ done
 
 # The command goes to tmux as separate arguments, so it runs without fish
 # (the default-shell) and the paths need no quoting.
-if [ -n "$window" ]; then
+if [ "$mode" = -w ]; then
   tmux new-window -n codegraph -c "$project" "$0" --run "$project"
+elif [ "$mode" != popup ]; then
+  tmux split-window "$mode" -t "$pane" -c "$project" "$0" --run "$project"
 else
   cell=$(tmux display -p -t "$pane" '#{client_cell_width}x#{client_cell_height}')
   tmux display-popup -E -w 90% -h 90% -t "$pane" -T " codegraph " \
