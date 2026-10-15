@@ -122,4 +122,4 @@ config-file = ?theme.generated
 
 # ─── Shell ───────────────────────────────────────────────────────────────────
 # fish: grey history-based autosuggestions out of the box
-command = fish
+command = /opt/homebrew/bin/fish
