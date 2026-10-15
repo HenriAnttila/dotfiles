@@ -58,13 +58,13 @@ function styles() {
       style: {
         label: "data(display)",
         "font-family": mono,
-        "font-size": 11,
+        "font-size": 14,
         color: c.text,
         "text-valign": "center",
         "text-halign": "center",
         shape: "round-rectangle",
         width: "data(w)",
-        height: 22,
+        height: NODE_H,
         "background-color": c.raised,
         "border-width": 1,
         "border-color": c.line,
@@ -82,7 +82,7 @@ function styles() {
         padding: 14,
       },
     },
-    { selector: "node.root", style: { "font-size": 13, "font-weight": "bold", color: c.text, "background-opacity": 0.2 } },
+    { selector: "node.root", style: { "font-size": 16, "font-weight": "bold", color: c.text, "background-opacity": 0.2 } },
     { selector: "node.external", style: { color: c.muted, "border-style": "dashed" } },
     { selector: "node.dim", style: { opacity: 0.4 } },
     { selector: "node.contains", style: { "border-color": c.accent, color: c.text } },
@@ -114,7 +114,7 @@ function styles() {
         "line-style": "dashed",
         label: "data(label)",
         "font-family": mono,
-        "font-size": 9,
+        "font-size": 12,
         color: c.remote,
         "text-rotation": "autorotate",
         "text-background-color": c.bg,
@@ -131,7 +131,7 @@ function elements(graph) {
   return [
     ...nodes.map((n) => ({
       group: "nodes",
-      data: { ...n, display: n.label, w: Math.max(36, n.label.length * 6.9 + 18) },
+      data: { ...n, display: n.label, w: Math.max(44, n.label.length * 8.6 + 22) },
       classes: [n.kind, n.external && "external", !n.parent && "root"].filter(Boolean).join(" "),
     })),
     ...graph.edges.map((e) => ({ group: "edges", data: e, classes: e.kind })),
@@ -140,12 +140,16 @@ function elements(graph) {
 
 const leaves = () => cy.nodes(":childless");
 
+// Bumped whenever node sizes change, so a layout saved for the old sizes is
+// laid out again instead of left overlapping.
+const LAYOUT_VERSION = 3;
+
 const savePositions = debounce(() => {
   const positions = {};
   leaves().forEach((n) => {
     positions[n.id()] = n.position();
   });
-  api("/api/layout", { method: "PUT", body: JSON.stringify(positions) });
+  api("/api/layout", { method: "PUT", body: JSON.stringify({ version: LAYOUT_VERSION, positions }) });
 }, 400);
 
 // The map is the folder tree, laid out the same way every time. A folder lists
@@ -153,10 +157,10 @@ const savePositions = debounce(() => {
 // subfolders below them in rows, also in name order. Links play no part: they
 // are hidden most of the time, and a layout pulled around by them moves
 // whenever a require changes.
-const NODE_H = 22;
+const NODE_H = 28;
 const GAP = 12;
 const PAD = 14;
-const LABEL = 18;
+const LABEL = 22;
 
 function packLayout() {
   const positions = {};
@@ -180,10 +184,12 @@ function packLayout() {
     };
   };
 
-  const shelves = (boxes, minW) => {
+  // Rows aim for the given width-to-height shape: roughly square inside
+  // folders, the graph area's own shape for the services at the top.
+  const shelves = (boxes, minW, aspect) => {
     if (!boxes.length) return { w: 0, h: 0, put() {} };
     const area = boxes.reduce((sum, b) => sum + b.w * b.h, 0);
-    const maxW = Math.max(minW, Math.sqrt(area) * 1.5, ...boxes.map((b) => b.w));
+    const maxW = Math.max(minW, Math.sqrt(area * aspect), ...boxes.map((b) => b.w));
     const rows = [[]];
     let rowW = 0;
     for (const box of boxes) {
@@ -212,9 +218,9 @@ function packLayout() {
     };
   };
 
-  const arrange = (nodes) => {
+  const arrange = (nodes, aspect = 2.25) => {
     const own = grid(nodes.filter((n) => n.isChildless()));
-    const folders = shelves(nodes.filter((n) => n.isParent()).map(measure), own.w);
+    const folders = shelves(nodes.filter((n) => n.isParent()).map(measure), own.w, aspect);
     const between = own.h && folders.h ? GAP * 2 : 0;
     return {
       w: Math.max(own.w, folders.w),
@@ -236,7 +242,7 @@ function packLayout() {
     };
   };
 
-  arrange(cy.nodes().orphans().sort(byName).toArray()).put(0, 0);
+  arrange(cy.nodes().orphans().sort(byName).toArray(), Math.max(1, cy.width() / Math.max(1, cy.height()))).put(0, 0);
   return positions;
 }
 
@@ -270,6 +276,24 @@ function place(saved) {
     placed.add(n.id());
   });
   savePositions();
+}
+
+// The whole map when it can be read at that size; otherwise as close as it
+// takes for labels to be readable, centred on what the change touched (or on
+// the middle of the map when it touched nothing in it). Fit always shows it all.
+const READABLE_ZOOM = 0.8;
+
+function focusChange(animate = true) {
+  cy.fit(undefined, 30);
+  if (cy.zoom() >= READABLE_ZOOM) return;
+  const changed = cy.nodes(".A, .M, .D, .R");
+  const target = changed.nonempty() ? changed : cy.nodes();
+  const view = { zoom: READABLE_ZOOM, center: { eles: target } };
+  if (animate) cy.animate({ ...view, duration: 300 });
+  else {
+    cy.zoom(READABLE_ZOOM);
+    cy.center(target);
+  }
 }
 
 async function reloadGraph() {
@@ -349,6 +373,7 @@ async function selectChange(ref, { fromEvent = false } = {}) {
   }
   if (state.file && !state.change.files.some((f) => f.path === state.file.path)) state.file = null;
   applyChange();
+  if (!same) focusChange();
   renderHeader();
   renderPanel();
   if (!$("commits").hidden) renderCommits();
@@ -862,7 +887,8 @@ function listen() {
 }
 
 async function main() {
-  const [graph, saved] = await Promise.all([api("/api/graph").then((r) => r.json()), api("/api/layout").then((r) => r.json())]);
+  const [graph, layout] = await Promise.all([api("/api/graph").then((r) => r.json()), api("/api/layout").then((r) => r.json())]);
+  const saved = layout.version === LAYOUT_VERSION ? layout.positions : {};
   state.graph = graph;
   document.title = `${graph.project} · codegraph`;
   $("project").textContent = graph.project;
@@ -877,7 +903,7 @@ async function main() {
     boxSelectionEnabled: false,
   });
   place(saved);
-  cy.fit(undefined, 30);
+  focusChange(false);
   wire();
 
   await loadMore();

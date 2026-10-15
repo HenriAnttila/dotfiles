@@ -61,7 +61,7 @@ html, body {
   height: 100%;
   background: var(--bg);
   color: var(--text);
-  font: 12.5px/1.5 var(--sans);
+  font: 15.5px/1.5 var(--sans);
 }
 
 body {
@@ -94,7 +94,7 @@ button:disabled { opacity: .35; cursor: default; }
 }
 
 .project {
-  font: 600 13px var(--mono);
+  font: 600 16px var(--mono);
   color: var(--muted);
   white-space: nowrap;
 }
@@ -107,7 +107,7 @@ button:disabled { opacity: .35; cursor: default; }
   flex: 1 1 auto;
 }
 
-.step { padding: 0 10px; font-size: 16px; line-height: 1; }
+.step { padding: 0 10px; font-size: 20px; line-height: 1; }
 
 .change-button {
   display: flex;
@@ -125,7 +125,7 @@ button:disabled { opacity: .35; cursor: default; }
   min-width: 0;
 }
 .change-meta {
-  font: 12px var(--mono);
+  font: 15px var(--mono);
   color: var(--muted);
   white-space: nowrap;
   margin-left: auto;
@@ -143,13 +143,13 @@ button:disabled { opacity: .35; cursor: default; }
 .links button.on { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 
 .search {
-  font: 12px var(--mono);
+  font: 15px var(--mono);
   color: var(--text);
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 5px 8px;
-  width: 200px;
+  width: 240px;
 }
 .search:focus { outline: none; border-color: var(--accent); }
 
@@ -181,11 +181,11 @@ button:disabled { opacity: .35; cursor: default; }
   text-align: left;
 }
 .commit:hover, .commit.current { background: var(--raised); }
-.commit .hash { font: 12px var(--mono); color: var(--accent); }
+.commit .hash { font: 15px var(--mono); color: var(--accent); }
 .commit .subject { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.commit .when { font: 12px var(--mono); color: var(--muted); white-space: nowrap; }
+.commit .when { font: 15px var(--mono); color: var(--muted); white-space: nowrap; }
 .commit.worktree .hash { color: var(--modified); }
-.commits .more { padding: 8px; text-align: center; color: var(--muted); font-size: 12px; }
+.commits .more { padding: 8px; text-align: center; color: var(--muted); font-size: 15px; }
 
 main {
   display: flex;
@@ -214,7 +214,7 @@ body.wide { --panel-w: 72%; }
   justify-content: flex-end;
   padding: 6px 8px 0;
 }
-.panel-tools button { font-size: 12px; padding: 2px 8px; }
+.panel-tools button { font-size: 15px; padding: 2px 8px; }
 
 .panel-body {
   overflow-y: auto;
@@ -223,19 +223,19 @@ body.wide { --panel-w: 72%; }
 }
 
 .panel h2 {
-  font: 600 15px var(--sans);
+  font: 600 19px var(--sans);
   margin: 4px 0 2px;
   word-break: break-word;
 }
 .panel h3 {
-  font: 600 11px var(--sans);
+  font: 600 14px var(--sans);
   text-transform: uppercase;
   letter-spacing: .06em;
   color: var(--muted);
   margin: 20px 0 6px;
 }
 .meta {
-  font: 12px var(--mono);
+  font: 15px var(--mono);
   color: var(--muted);
   word-break: break-all;
 }
@@ -244,7 +244,7 @@ body.wide { --panel-w: 72%; }
   background: none;
   padding: 0;
   color: var(--accent);
-  font-size: 12px;
+  font-size: 15px;
 }
 
 .files, .refs {
@@ -263,14 +263,14 @@ body.wide { --panel-w: 72%; }
 }
 .refs li { grid-template-columns: 1fr auto; }
 .files li:hover, .refs li:hover, .files li.current { background: var(--raised); }
-.files .name, .refs .name { font: 12px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.files .name, .refs .name { font: 15px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .files .where, .refs .where { color: var(--faint); }
-.counts { font: 12px var(--mono); white-space: nowrap; }
+.counts { font: 15px var(--mono); white-space: nowrap; }
 .counts .plus { color: var(--added); }
 .counts .minus { color: var(--deleted); }
 
 .status {
-  font: 700 11px var(--mono);
+  font: 700 14px var(--mono);
   text-align: center;
 }
 .status.A { color: var(--added); }
@@ -281,16 +281,16 @@ body.wide { --panel-w: 72%; }
 .empty { color: var(--muted); font-style: italic; }
 
 .summary { margin: 12px 0 2px; color: var(--text); }
-.by { margin: 2px 0 0; font-size: 11px; color: var(--muted); }
-.status-line { margin: 12px 0 0; color: var(--accent); font-size: 12px; }
+.by { margin: 2px 0 0; font-size: 14px; color: var(--muted); }
+.status-line { margin: 12px 0 0; color: var(--accent); font-size: 15px; }
 .status-line::before { content: "◌ "; display: inline-block; animation: spin 1.2s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .feature { margin-top: 18px; padding-left: 10px; border-left: 2px solid var(--line); }
-.feature h3 { margin: 0 0 2px; color: var(--accent); text-transform: none; letter-spacing: 0; font-size: 13px; }
+.feature h3 { margin: 0 0 2px; color: var(--accent); text-transform: none; letter-spacing: 0; font-size: 16px; }
 .feature .description { margin: 0 0 6px; color: var(--text); }
 
-.structure { list-style: none; margin: 0; padding: 0; font-size: 12px; }
+.structure { list-style: none; margin: 0; padding: 0; font-size: 15px; }
 .structure li { display: grid; grid-template-columns: 14px 1fr; gap: 6px; padding: 2px 6px; border-radius: 5px; }
 .structure li[data-node] { cursor: pointer; }
 .structure li[data-node]:hover { background: var(--raised); }
@@ -301,7 +301,7 @@ body.wide { --panel-w: 72%; }
 .structure .where { color: var(--muted); }
 
 .note { margin: 8px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; padding: 8px 10px; border-left: 2px solid var(--accent); background: var(--raised); border-radius: 0 6px 6px 0; }
-.note dt { color: var(--accent); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding-top: 2px; }
+.note dt { color: var(--accent); font-size: 14px; text-transform: uppercase; letter-spacing: .06em; padding-top: 2px; }
 .note dd { margin: 0; }
 
 .commit .described { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 8px; vertical-align: middle; }
@@ -310,7 +310,7 @@ body.wide { --panel-w: 72%; }
 .diff .d2h-files-diff, .diff .d2h-file-diff { overflow-x: auto; }
 .diff .d2h-file-header { display: none; }
 .diff .d2h-wrapper, .diff .d2h-file-wrapper { border-radius: 6px; }
-.diff .d2h-code-line, .diff .d2h-code-side-line, .diff .d2h-code-linenumber, .diff .d2h-code-side-linenumber { font-family: var(--mono); }
+.diff .d2h-diff-table { font-family: var(--mono); font-size: 14.5px; }
 
 /* Code in the diffs, coloured like the terminal's palette */
 .hljs { color: var(--text); background: transparent; }
@@ -330,7 +330,7 @@ body.wide { --panel-w: 72%; }
   border-top: 1px solid var(--line);
   background: var(--surface);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 15px;
 }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend .sep { width: 1px; height: 12px; background: var(--line); }
