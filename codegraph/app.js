@@ -38,6 +38,8 @@ const state = {
   file: null,
   structure: null,
   explanation: null,
+  claude: null,
+  trailOpen: false,
   links: "selected",
 };
 
@@ -88,6 +90,8 @@ function styles() {
     { selector: "node.contains", style: { "border-color": c.accent, color: c.text } },
     ...STATUSES.map((s) => ({ selector: `node.${s}`, style: { "border-color": status[s], "border-width": 2.5, opacity: 1 } })),
     ...STATUSES.map((s) => ({ selector: `node.${s}:childless`, style: { "background-color": status[s], "background-opacity": 0.22 } })),
+    { selector: "node.trail-read", style: { "underlay-color": c.accent, "underlay-opacity": 0.24, "underlay-padding": 4, opacity: 1 } },
+    { selector: "node.trail-edit", style: { "underlay-color": c.accent, "underlay-opacity": 0.38, "underlay-padding": 6, opacity: 1 } },
     { selector: "node.match", style: { "underlay-color": c.accent, "underlay-opacity": 0.3, "underlay-padding": 4, opacity: 1 } },
     { selector: "node.neighbor", style: { "underlay-color": c.accent, "underlay-opacity": 0.18, "underlay-padding": 3, opacity: 1 } },
     { selector: "node:selected", style: { "underlay-color": c.accent, "underlay-opacity": 0.45, "underlay-padding": 5, opacity: 1 } },
@@ -324,6 +328,7 @@ async function reloadGraph() {
   }
   if (state.selected && cy.getElementById(state.selected).empty()) state.selected = null;
   applyChange();
+  applyTrail();
   renderPanel();
 }
 
@@ -651,6 +656,88 @@ function refList(title, items) {
   return `<h3>${title} (${items.length})</h3><ul class="refs">${rows}</ul>`;
 }
 
+// ---------------------------------------------------------------- Claude's trail
+//
+// What the Claude session working on this project read and edited since your
+// last prompt (follow.ts), marked on the graph until the next prompt. A file is
+// marked edited the moment Claude edits it, and its module flashes.
+
+const WORKING_MS = 20000;
+let lastFlash = null;
+
+async function loadTrail() {
+  state.claude = await (await api("/api/claude")).json();
+  applyTrail();
+  renderChip();
+  if (state.trailOpen) renderPanel();
+}
+
+function applyTrail() {
+  const t = state.claude;
+  cy.batch(() => {
+    cy.nodes().removeClass("trail-read trail-edit");
+    for (const path of t?.reads ?? []) nodeOf(path)?.addClass("trail-read");
+    for (const path of t?.edits ?? []) nodeOf(path)?.addClass("trail-edit");
+  });
+  // The first trail the page sees only sets where flashing starts from.
+  const edit = t?.lastEdit;
+  const key = edit ? `${edit.at}:${edit.path}` : "";
+  if (lastFlash !== null && key && key !== lastFlash) {
+    const node = nodeOf(edit.path);
+    if (node) flash(node);
+  }
+  lastFlash = key;
+}
+
+function nodeOf(path) {
+  const id = state.graph.files[path];
+  const node = id ? cy.getElementById(id) : null;
+  return node && node.nonempty() ? node : null;
+}
+
+function flash(node) {
+  node
+    .animate({ style: { "underlay-opacity": 0.9, "underlay-padding": 12 } }, { duration: 180 })
+    .animate({ style: { "underlay-opacity": 0.38, "underlay-padding": 6 } }, { duration: 1400, complete: () => node.removeStyle("underlay-opacity underlay-padding") });
+}
+
+const working = () => state.claude?.updatedAt && Date.now() - new Date(state.claude.updatedAt).getTime() < WORKING_MS;
+
+function renderChip() {
+  const chip = $("claude");
+  const t = state.claude;
+  chip.hidden = !t?.prompt;
+  if (chip.hidden) return;
+  chip.classList.toggle("working", !!working());
+  $("claude-text").textContent = `Claude · ${t.edits.length} edited · ${t.reads.length} read`;
+  chip.title = t.prompt;
+}
+
+function trailRows(paths) {
+  return paths
+    .map((path) => {
+      const node = nodeOf(path);
+      const [dir, base] = node ? [instancePath(node.parent().id() || ""), node.data("label")] : split(path);
+      return `<li ${node ? `data-node="${esc(node.id())}"` : ""}><span class="name">${esc(base)} <span class="where">${esc(dir)}</span></span></li>`;
+    })
+    .join("");
+}
+
+function renderTrail(body) {
+  const t = state.claude;
+  if (!t?.prompt) {
+    body.innerHTML = `<button class="back" data-back>← Back</button><p class="empty">Nothing from Claude in this project yet.</p>`;
+    return;
+  }
+  body.innerHTML = `<button class="back" data-back>← ${esc(backLabel())}</button>
+    <h2>Claude's trail</h2>
+    <div class="meta">${working() ? "working now" : `last active ${ago(t.updatedAt)}`} · since your prompt ${ago(t.promptAt)}</div>
+    <blockquote class="prompt">${esc(t.prompt)}</blockquote>
+    ${t.edits.length ? `<h3>Edited (${t.edits.length})</h3><ul class="refs">${trailRows(t.edits)}</ul>` : ""}
+    ${t.reads.length ? `<h3>Read (${t.reads.length})</h3><ul class="refs">${trailRows(t.reads)}</ul>` : ""}
+    ${t.edits.length || t.reads.length ? "" : `<p class="empty">Hasn't opened anything in this project yet.</p>`}`;
+}
+
 // ---------------------------------------------------------------- what a module does
 //
 // From the comment the file opens with when it has one, otherwise the sentence
@@ -774,7 +861,8 @@ async function drawDiff(el, f) {
 function renderPanel() {
   const body = $("panel-body");
   const node = state.selected ? cy.getElementById(state.selected) : null;
-  if (node && node.nonempty()) renderNode(body, node);
+  if (state.trailOpen) renderTrail(body);
+  else if (node && node.nonempty()) renderNode(body, node);
   else if (state.file) renderFile(body, state.file);
   else renderSummary(body);
 }
@@ -784,6 +872,7 @@ function selectNode(id, { center = false } = {}) {
   if (node.empty()) return;
   state.selected = id;
   state.file = null;
+  state.trailOpen = false;
   cy.elements(":selected").unselect();
   node.select();
   if (center) cy.animate({ center: { eles: node }, duration: 250 });
@@ -794,6 +883,7 @@ function selectNode(id, { center = false } = {}) {
 function clearSelection() {
   state.selected = null;
   state.file = null;
+  state.trailOpen = false;
   cy.elements(":selected").unselect();
   showLinks();
   renderPanel();
@@ -880,6 +970,16 @@ function wire() {
     }
   };
 
+  $("claude").onclick = () => {
+    state.trailOpen = true;
+    state.selected = null;
+    state.file = null;
+    cy.elements(":selected").unselect();
+    showLinks();
+    renderPanel();
+  };
+  setInterval(renderChip, 5000);
+
   $("fit").onclick = () => cy.animate({ fit: { padding: 30 }, duration: 250 });
   $("relayout").onclick = () => {
     relayout();
@@ -927,6 +1027,7 @@ function listen() {
   events.onmessage = async (message) => {
     const event = JSON.parse(message.data);
     if (event.theme) reloadTheme();
+    if (event.claude) await loadTrail();
     if (event.graph) await reloadGraph();
     if (event.explanations) {
       await loadDescription({ fromEvent: true, structure: false });
@@ -961,6 +1062,7 @@ async function main() {
 
   await loadMore();
   await selectChange(currentRef());
+  await loadTrail();
   listen();
 }
 

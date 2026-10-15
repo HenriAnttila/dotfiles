@@ -377,3 +377,9 @@ body.wide { --panel-w: 72%; }
   line-height: 1.45;
 }
 .tip b { display: block; color: var(--accent); font-weight: 600; margin-bottom: 2px; }
+
+.claude { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.claude .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.claude.working .dot { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .25; } }
+.prompt { margin: 12px 0 0; padding: 8px 12px; border-left: 2px solid var(--accent); background: var(--raised); border-radius: 0 6px 6px 0; white-space: pre-wrap; }

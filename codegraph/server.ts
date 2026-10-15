@@ -20,12 +20,16 @@
 // page shows a change that has none, and after Claude commits (hook.ts). The
 // page hears when one lands.
 //
+// Claude's trail (follow.ts): what the session working on this project read
+// and edited since your last prompt, sent to the page as it happens.
+//
 // Node positions are kept in .git/codegraph/layout.json in the project's
 // repository, so the map stays the same between runs and never gets committed.
 
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, watch, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
+import { Follower, PROJECTS } from "./follow.ts";
 import { Repo, WORKTREE } from "./git.ts";
 import { Store } from "./store.ts";
 import { liveGraph, structure } from "./structure.ts";
@@ -106,6 +110,21 @@ watch(project, { recursive: true }, (_, file) => {
 });
 if (!gitInProject) watch(repo.gitDir, { recursive: true }, (_, file) => file && changed(file.toString(), true));
 
+// Claude's trail: any transcript written to may be the session this project
+// follows, or a new one taking over, so each change is checked after a moment.
+const follower = new Follower(project, store);
+follower.refresh();
+let claudeTimer: Timer | null = null;
+if (existsSync(PROJECTS)) {
+  watch(PROJECTS, { recursive: true }, (_, file) => {
+    if (!file?.toString().endsWith(".jsonl")) return;
+    claudeTimer ??= setTimeout(() => {
+      claudeTimer = null;
+      if (follower.refresh()) broadcast({ claude: true });
+    }, 200);
+  });
+}
+
 // A theme pick rewrites Ghostty's theme.generated; the page swaps in the new colours.
 let themeTimer: Timer | null = null;
 if (existsSync(GHOSTTY_DIR)) {
@@ -172,6 +191,8 @@ const routes: Record<string, (url: URL, req: Request) => Response | Promise<Resp
     }
     return json({ project: basename(project), ...graph });
   },
+
+  "/api/claude": () => json(follower.trail),
 
   "/api/purposes": (_, req) => {
     if (req.method !== "POST") return json({ error: "POST to start" }, 400);
