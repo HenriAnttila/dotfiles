@@ -1,8 +1,8 @@
 :root {
-  --bg: #0e1015;
-  --surface: #151821;
-  --raised: #1c2030;
-  --line: #2a2f3d;
+  --bg: #000000;
+  --surface: #0b0c10;
+  --raised: #16181f;
+  --line: #262a34;
   --text: #d8dbe2;
   --muted: #8b92a3;
   --faint: #5d6474;
@@ -20,26 +20,6 @@
   color-scheme: dark;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg: #f6f7f9;
-    --surface: #ffffff;
-    --raised: #eef0f4;
-    --line: #d9dde5;
-    --text: #1d2230;
-    --muted: #5f6677;
-    --faint: #9aa1b0;
-    --accent: #3b6fe0;
-    --added: #2f9e5b;
-    --modified: #b7871b;
-    --deleted: #d64550;
-    --renamed: #3b6fe0;
-    --require: #a3abbd;
-    --starts: #9a5fa0;
-    --remote: #c97a26;
-    color-scheme: light;
-  }
-}
 
 * { box-sizing: border-box; }
 

@@ -575,7 +575,7 @@ async function drawDiff(el, f) {
     matching: "lines",
     outputFormat: document.body.classList.contains("wide") ? "side-by-side" : "line-by-line",
     highlight: true,
-    colorScheme: "auto",
+    colorScheme: "dark",
     fileContentToggle: false,
     synchronisedScroll: true,
   });
@@ -716,8 +716,6 @@ function wire() {
       else clearSelection();
     }
   });
-
-  matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => cy.style(styles()));
 }
 
 function listen() {
