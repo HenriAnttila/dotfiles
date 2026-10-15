@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>codegraph</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/diff2html@3.4.56/bundles/css/diff2html.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="bar">
+    <div class="project" id="project"></div>
+
+    <div class="change">
+      <button id="older" class="step" title="Older change (←)">‹</button>
+      <button id="change-button" class="change-button" aria-haspopup="listbox">
+        <span id="change-title" class="change-title">Loading…</span>
+        <span id="change-meta" class="change-meta"></span>
+      </button>
+      <button id="newer" class="step" title="Newer change (→)">›</button>
+    </div>
+
+    <div class="links" role="group" aria-label="Links">
+      <span class="label">Links</span>
+      <button data-links="selected" class="on" title="Only the selected module's links">Selected</button>
+      <button data-links="changed" title="Links between the modules this change touched">Changed</button>
+      <button data-links="all" title="Every link">All</button>
+    </div>
+
+    <input id="search" class="search" placeholder="Find a module   /" autocomplete="off" spellcheck="false">
+    <button id="fit" title="Fit the graph (f)">Fit</button>
+    <button id="relayout" title="Lay the graph out again from scratch">Re-layout</button>
+  </header>
+
+  <div id="commits" class="commits" role="listbox" hidden></div>
+
+  <main>
+    <div id="graph" class="graph"></div>
+    <aside id="panel" class="panel">
+      <div class="panel-tools">
+        <button id="expand" title="Widen the panel (e)">Widen</button>
+      </div>
+      <div id="panel-body" class="panel-body"></div>
+    </aside>
+  </main>
+
+  <footer class="legend">
+    <span><i class="swatch A"></i>added</span>
+    <span><i class="swatch M"></i>modified</span>
+    <span><i class="swatch D"></i>deleted</span>
+    <span><i class="swatch R"></i>renamed</span>
+    <span class="sep"></span>
+    <span><i class="edge require"></i>requires</span>
+    <span><i class="edge starts"></i>starts</span>
+    <span><i class="edge remote"></i>remote</span>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.34.3/dist/cytoscape.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/diff2html@3.4.56/bundles/js/diff2html-ui-slim.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
