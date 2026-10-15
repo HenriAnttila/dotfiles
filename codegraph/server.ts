@@ -175,6 +175,6 @@ for (let attempt = 0; ; attempt++) {
     console.log(`codegraph: ${basename(project)} on http://localhost:${server.port}`);
     break;
   } catch (error) {
-    if (attempt >= 20 || !String(error).includes("EADDRINUSE")) throw error;
+    if (attempt >= 20 || (error as { code?: string }).code !== "EADDRINUSE") throw error;
   }
 }
