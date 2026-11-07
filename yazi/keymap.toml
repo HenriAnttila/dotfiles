@@ -7,3 +7,13 @@ desc = "Open in new tmux window"
 on   = [ "c", "j" ]
 run  = 'shell "sips -s format jpeg \"$0\" --out \"${0%.*}.jpg\" && rm \"$0\"" --confirm'
 desc = "Convert to JPEG"
+
+[[mgr.prepend_keymap]]
+on   = "<Enter>"
+run  = "plugin split-enter"
+desc = "Folder: tmux split beside yazi there; file: open"
+
+[[mgr.prepend_keymap]]
+on   = [ "g", "s" ]
+run  = 'shell "tmux split-window -h -c $0" --confirm'
+desc = "Open in tmux split beside yazi"
