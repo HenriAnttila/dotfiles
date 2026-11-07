@@ -109,6 +109,50 @@ metres and has no project folder above it, so set both:
 `meshview ctl ref unit 1`. This is for looking; the coral-frame-analysis skill's
 review rounds stay the way to decide a part matches.
 
+## Models built by scripts (the Coral repo)
+
+The coral models are built by Python running in headless Blender, so a change
+is made in the scripts (and `findings.json`), never by hand in a .glb. Per the
+repo's README: `build_room.py` writes `room.blend` and `room.glb`;
+`build_console.py`, `build_seat.py` and `build_pillar.py` write `*_src.blend`,
+which `tools/console_bake.py` bakes. When the user asks to change a part:
+
+1. **Find its code by the object name** (from `meshview ctl click`, `ctl
+   objects`, or what they said), in the repo:
+   `grep -rln --include='*.py' -e '<name>' .`
+   - Builders are `build_*.py`, `room_parts.py`, `room_*.py` and
+     `console_build/*.py`. Generated names come from f-strings
+     (`Pillar_+30` is `f'Pillar_{slot:+d}'`), so search the prefix too.
+   - `tools/apply_*.py` are the quick path: each swaps one kind of part into a
+     room .blend from its builder as the builder is now.
+   - Other `tools/` hits (seat_check, part_match, material_compare, ...) only
+     check or render the part; they don't build it.
+   - Read the builder's header comment, and follow the repo's own rules for
+     where a number belongs (measurements with their source in `findings.json`).
+2. **Make the change** in the builder or the data.
+3. **Show it without touching the real files.** Don't run the real builds for a
+   preview: they rewrite `room.blend` and the .glb files, which Henri saves by
+   hand and other sessions use. Instead:
+
+   ```sh
+   ~/.claude/skills/model-preview/scripts/preview_build.sh <repo>/room.blend [tools/apply_<x>.py [parts=A,B]]
+   ~/.claude/skills/model-preview/scripts/show.sh ~/.cache/meshview/room.glb   # first time only
+   ```
+
+   It opens the .blend, runs the given apply scripts with saving forced off,
+   exports the visible scene to `~/.cache/meshview/room.glb` (metres, the whole
+   room with the console), and checks the .blend's timestamp is unchanged.
+   That takes about 5 s plain, 8 s with `apply_seat_parts.py`. The pane reloads
+   when that file changes, so after the first show only re-run
+   `preview_build.sh`. Footage view (`r`, `ctl ref`) works on it with no setup.
+4. **Point at what changed:** `meshview ctl frame <part>` and
+   `meshview ctl mark <object>`, and say in words what changed ("the pads sit
+   2 cm higher").
+
+If the part has no apply script, the preview needs that part's real build:
+say which files the build would rewrite and ask before running it. Run the real
+builds only when Henri asks.
+
 ## Checking a model yourself
 
 You cannot see the pane. To look at the model, render a snapshot and read the

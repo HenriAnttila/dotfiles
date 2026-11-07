@@ -1020,7 +1020,11 @@ class Viewer:
         self.click = None  # last thing the user clicked, for Claude
         self.click_mark = None  # viewer-space point under the teal ring
         self.claude_mark = None  # viewer-space point under the gold ring
-        self.refs = find_refs(model)  # placed shots of the footage, if the model's project has them
+        # <model>.meshview.json (written by model-preview's preview_build.sh): the source
+        # .blend's placed shots and the file's unit, for a preview outside the project
+        side = Path(str(self.model) + ".meshview.json")
+        side = json.loads(side.read_text()) if side.exists() else {}
+        self.refs = shots_in(side["refs"]) if side.get("refs") else find_refs(model)
         self.ref_shots = {}
         self.ref = None  # (shot index, frame index) while showing the model through a show camera
         self.ref_style = "wire"
@@ -1028,7 +1032,7 @@ class Viewer:
         # metres per file unit for the footage cameras: the project's .glb exports are in studs
         in_project = bool(self.refs) and not os.environ.get("MESHVIEW_REFS")
         default_unit = STUD_M if in_project and Path(model).suffix.lower() == ".glb" else 1.0
-        self.unit_m = float(os.environ.get("MESHVIEW_UNIT_M", default_unit))
+        self.unit_m = float(os.environ.get("MESHVIEW_UNIT_M", side.get("unit_m", default_unit)))
         self.glb = self.model
         if self.model.suffix.lower() == ".blend":
             cache = Path(tempfile.gettempdir()) / "meshview"
