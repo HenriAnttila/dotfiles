@@ -766,6 +766,11 @@ class Screen:
             f.write(zlib.compress(img.tobytes(), 1))
         self.files.append((time.time(), path))
         payload = base64.b64encode(path.encode()).decode()
+        if self.grid != (cols, rows):
+            # The pane changed size. Re-sending the image under the same id keeps its
+            # old placement (old cols x rows) in Ghostty, which then fits the new frame
+            # into the old box: bands of bare background. Drop the image first.
+            self.write(self.wrap(f"\x1b_Ga=d,d=I,i={IMAGE_ID},q=2\x1b\\"))
         self.write(self.wrap(
             f"\x1b_Ga=T,t=t,f=24,o=z,s={w},v={h},i={IMAGE_ID},U=1,c={cols},r={rows},q=2;{payload}\x1b\\"
         ))
