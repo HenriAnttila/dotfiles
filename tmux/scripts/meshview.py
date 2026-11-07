@@ -1289,7 +1289,7 @@ class Viewer:
         elif k in "{}":
             self.enter_ref((self.ref[0] + (1 if k == "}" else -1)) % len(self.refs), frame=0)
         elif k == "o":
-            styles = ["wire", "ghost", "model"]
+            styles = ["wire", "ghost", "model", "footage"]
             self.ref_style = styles[(styles.index(self.ref_style) + 1) % len(styles)]
         self.interact()
         return True
@@ -1333,6 +1333,11 @@ class Viewer:
         if self.ref is None:
             return self.renderer.render(self.cam, draw_mode, W, H, self.wire, self.grid, quality, self.markers())
         rw, rh, ox, oy, ov = self.ref_view(W, H)
+        if self.ref_style == "footage":  # the real frame alone, nothing drawn on it
+            canvas = np.empty((H, W, 3), dtype=np.float32)
+            canvas[:] = BG_BOTTOM
+            canvas[oy:oy + rh, ox:ox + rw] = self.footage(rw, rh)
+            return (np.clip(canvas, 0, 1) * 255).astype(np.uint8)
         layer = self.renderer.render(self.cam, draw_mode, rw, rh, self.wire, False, True, self.markers(),
                                      override=ov, layer="wire" if self.ref_style == "wire" else "shaded")
         layer = layer.astype(np.float32) / 255
@@ -1452,7 +1457,7 @@ class Viewer:
                 "mark X,Y,Z | mark NAME | mark clear": "gold ring at a point or an object's centre",
                 "snapshot PATH [view=…] [frame=NAME] [from=X,Y,Z] [at=X,Y,Z] [mode=…] [size=WxH]": "a render of its own to a PNG; the pane's view never changes",
                 "ref list | ref SHOT [FRAME] | ref next|prev [shot] | ref off": "the model through a solved show camera, over that frame",
-                "ref style wire|ghost|model | ref unit METRES_PER_UNIT | ref dir PATH": "overlay look; file units; where the placed shots are",
+                "ref style wire|ghost|model|footage | ref unit METRES_PER_UNIT | ref dir PATH": "overlay look (footage: the frame alone); file units; where the placed shots are",
             }, "coords": "Blender (Z up), file units"}
         if cmd == "state":
             return {
