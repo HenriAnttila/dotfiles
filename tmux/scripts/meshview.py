@@ -40,6 +40,7 @@ import termios
 import time
 import tty
 import zlib
+import json
 from pathlib import Path
 
 import numpy as np
@@ -501,7 +502,7 @@ class Renderer:
         proj = perspective(FOV, w / h, 0.02 * cam.dist, 40.0 + cam.dist * 4)
         return eye, view, proj @ view
 
-    def pick(self, cam, w, h, px, py):
+    def pick(self, cam, w, h, px, py, override=None):
         """What is under pixel (px, py), top-left origin: (part index, triangle, point) or None."""
         c = self.ctx
         if self.pick_size != (w, h):
@@ -509,7 +510,7 @@ class Renderer:
             self.pick_depth = c.depth_texture((w, h))
             self.pick_fbo = c.framebuffer(color_attachments=[self.pick_ids], depth_attachment=self.pick_depth)
             self.pick_size = (w, h)
-        _, _, vp = self.matrices(cam, w, h)
+        _, _, vp = override or self.matrices(cam, w, h)
         self.pick_fbo.use()
         c.viewport = (0, 0, w, h)
         self.pick_fbo.clear(0, 0, 0, 0, depth=1.0)
@@ -530,12 +531,16 @@ class Renderer:
         world = np.linalg.inv(vp) @ ndc
         return int(ids[0]) - 1, int(ids[1]), world[:3] / world[3]
 
-    def render(self, cam, mode, w, h, wire, grid, quality, markers=()):
+    def render(self, cam, mode, w, h, wire, grid, quality, markers=(), override=None, layer=None):
+        """The frame as RGB. override: (eye, view, vp) for a camera not from `cam` (reference
+        footage). layer: "wire" (hidden-line wireframe only) or "shaded" gives RGBA on a
+        transparent background, with no floor, for laying over footage."""
         mgl, c = self.mgl, self.ctx
         samples = self.max_samples if quality else min(4, self.max_samples)
         self.ensure_size(w, h, samples)
-        eye, view, vp = self.matrices(cam, w, h)
-        target = cam.target
+        eye, view, vp = override or self.matrices(cam, w, h)
+        if layer:
+            grid = False
         key = normalize(np.array([0.45, 0.85, 0.35]))
         lview = look_at(key * 4.0, np.zeros(3), np.array([0.0, 0.0, 1.0]) if abs(key[1]) > 0.99 else np.array([0.0, 1.0, 0.0]))
         light_vp = ortho(-1.7, 1.7, -1.7, 1.7, 0.5, 8.0) @ lview
@@ -552,11 +557,12 @@ class Renderer:
 
         self.ms_fbo.use()
         c.viewport = (0, 0, w, h)
-        c.clear(0, 0, 0, 1, depth=1.0)
+        c.clear(0, 0, 0, 0 if layer else 1, depth=1.0)
         c.disable(mgl.DEPTH_TEST)
-        self.set(self.bg_prog, "u_top", BG_TOP)
-        self.set(self.bg_prog, "u_bottom", BG_BOTTOM)
-        self.bg_vao.render(mgl.TRIANGLES, vertices=3)
+        if not layer:
+            self.set(self.bg_prog, "u_top", BG_TOP)
+            self.set(self.bg_prog, "u_bottom", BG_BOTTOM)
+            self.bg_vao.render(mgl.TRIANGLES, vertices=3)
 
         c.enable(mgl.DEPTH_TEST)
         c.disable(mgl.CULL_FACE)
@@ -571,6 +577,9 @@ class Renderer:
         self.set(mp, "u_tex", 0)
         self.set(mp, "u_shadow", 1)
         self.shadow_tex.use(location=1)
+        if layer == "wire":  # depth only, so the wireframe hides what's behind the model
+            c.enable(mgl.BLEND)
+            c.blend_func = mgl.ZERO, mgl.ONE
         for p in self.parts:
             self.set(mp, "u_base", tuple(float(x) for x in p.base))
             self.set(mp, "u_metal", p.metal)
@@ -579,11 +588,12 @@ class Renderer:
             (p.gltex or self.white).use(location=0)
             p.vao.render()
 
-        if wire:
+        c.disable(mgl.BLEND)
+        if wire or layer == "wire":
             c.wireframe = True
             self.set(mp, "u_mode", 3)
             self.set(mp, "u_push", 0.0008)
-            self.set(mp, "u_wire", (0.27, 0.88, 0.80, 1.0) if mode == 0 else (0.02, 0.06, 0.07, 1.0))
+            self.set(mp, "u_wire", (0.27, 0.88, 0.80, 1.0) if mode == 0 or layer == "wire" else (0.02, 0.06, 0.07, 1.0))
             for p in self.parts:
                 p.vao.render()
             c.wireframe = False
@@ -618,8 +628,9 @@ class Renderer:
             c.disable(mgl.BLEND)
 
         c.copy_framebuffer(self.out_fbo, self.ms_fbo)
-        data = self.out_fbo.read(components=3, alignment=1)
-        img = np.frombuffer(data, dtype=np.uint8).reshape(h, w, 3)[::-1]
+        n = 4 if layer else 3
+        data = self.out_fbo.read(components=n, alignment=1)
+        img = np.frombuffer(data, dtype=np.uint8).reshape(h, w, n)[::-1]
         return np.ascontiguousarray(img)
 
 
@@ -835,6 +846,104 @@ def parse_input(buf):
     return events
 
 
+# ─── reference footage: solved show cameras ──────────────────────────────────
+# A project's placed shots (the coral room's observations/place/<shot>/): a COLMAP
+# solve of the footage (solve/radial/*.bin, frames in solve/images/) and a
+# placement.json putting the build frame (Blender: metres, Z up) into the solve
+# frame: X_solve = e^logscale * R(rotvec) * Rz(turn_deg) * X_build + shift
+# (Coral tools/shot3d.py to_solve). A .glb from the project's build is in Roblox
+# studs (build_room.py: 1 stud = 0.28 m).
+STUD_M = 0.28
+
+
+def find_refs(model):
+    """The placed shots for a model: observations/place in it or a folder above it."""
+    env = os.environ.get("MESHVIEW_REFS")
+    for d in ([Path(env)] if env else []) + [p / "observations" / "place" for p in Path(model).resolve().parents]:
+        shots = shots_in(d)
+        if shots:
+            return shots
+    return []
+
+
+def shots_in(d):
+    d = Path(d).expanduser()
+    if not d.is_dir():
+        return []
+    return sorted(x for x in d.iterdir() if (x / "placement.json").exists() and (x / "solve" / "radial").is_dir())
+
+
+def read_colmap(d):
+    """COLMAP binary cameras + images: K (f, cx, cy, k1, k2), (w, h), [(name, R, t)] by name."""
+    b = (d / "cameras.bin").read_bytes()
+    _, model, w, h = struct.unpack_from("<iiQQ", b, 8)
+    params = struct.unpack_from(f"<{(len(b) - 32) // 8}d", b, 32)
+    if model == 2:  # SIMPLE_RADIAL
+        K = dict(f=params[0], cx=params[1], cy=params[2], k1=params[3], k2=0.0)
+    elif model == 3:  # RADIAL
+        K = dict(f=params[0], cx=params[1], cy=params[2], k1=params[3], k2=params[4])
+    else:
+        raise ValueError(f"camera model {model} not handled")
+    b = (d / "images.bin").read_bytes()
+    n, o, frames = struct.unpack_from("<Q", b, 0)[0], 8, []
+    for _ in range(n):
+        qw, qx, qy, qz = struct.unpack_from("<4d", b, o + 4)
+        t = np.array(struct.unpack_from("<3d", b, o + 36))
+        o += 64
+        e = b.index(b"\0", o)
+        name = b[o:e].decode()
+        o = e + 1
+        o += 8 + struct.unpack_from("<Q", b, o)[0] * 24
+        R = np.array([
+            [1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy - qw * qz), 2 * (qx * qz + qw * qy)],
+            [2 * (qx * qy + qw * qz), 1 - 2 * (qx * qx + qz * qz), 2 * (qy * qz - qw * qx)],
+            [2 * (qx * qz - qw * qy), 2 * (qy * qz + qw * qx), 1 - 2 * (qx * qx + qy * qy)],
+        ])
+        frames.append((name, R, t))
+    return K, (w, h), sorted(frames, key=lambda f: f[0])
+
+
+class RefShot:
+    def __init__(self, path):
+        from scipy.spatial.transform import Rotation
+
+        self.path, self.name = path, path.name
+        P = json.loads((path / "placement.json").read_text())
+        x = np.asarray(P["x"], dtype=np.float64)
+        self.K, self.size, self.frames = read_colmap(path / "solve" / "radial")
+        turn = math.radians(float(P["turn_deg"]))
+        Rz = np.array([[math.cos(turn), -math.sin(turn), 0], [math.sin(turn), math.cos(turn), 0], [0, 0, 1]])
+        self.Rp, self.shift, self.scale = Rotation.from_rotvec(x[:3]).as_matrix() @ Rz, x[3:6], math.exp(x[6])
+        self.cache = {}
+
+    def camera(self, i):
+        """Build frame (metres) -> this frame's camera (COLMAP: x right, y down, z forward)."""
+        _, Rf, tf = self.frames[i]
+        return Rf @ self.Rp, (Rf @ self.shift + tf) / self.scale
+
+    def image(self, i):
+        """The frame, undistorted to a pinhole camera with the same f, cx, cy (float RGB 0-1)."""
+        if i in self.cache:
+            return self.cache[i]
+        from PIL import Image
+        from scipy.ndimage import map_coordinates
+
+        src = np.asarray(Image.open(self.path / "solve" / "images" / self.frames[i][0]).convert("RGB"),
+                         dtype=np.float32) / 255
+        h, w, _ = src.shape
+        K = self.K
+        v, u = np.mgrid[0:h, 0:w].astype(np.float64)
+        x, y = (u - K["cx"]) / K["f"], (v - K["cy"]) / K["f"]
+        r2 = x * x + y * y
+        d = 1 + K["k1"] * r2 + K["k2"] * r2 * r2
+        coords = [K["cy"] + K["f"] * y * d, K["cx"] + K["f"] * x * d]
+        out = np.stack([map_coordinates(src[..., c], coords, order=1, mode="constant") for c in range(3)], -1)
+        if len(self.cache) > 6:
+            self.cache.pop(next(iter(self.cache)))
+        self.cache[i] = out.astype(np.float32)
+        return self.cache[i]
+
+
 # ─── statistics panel ────────────────────────────────────────────────────────
 def fmt_num(v):
     return f"{v:,.0f}" if abs(v) >= 100 else f"{v:.3g}"
@@ -911,6 +1020,15 @@ class Viewer:
         self.click = None  # last thing the user clicked, for Claude
         self.click_mark = None  # viewer-space point under the teal ring
         self.claude_mark = None  # viewer-space point under the gold ring
+        self.refs = find_refs(model)  # placed shots of the footage, if the model's project has them
+        self.ref_shots = {}
+        self.ref = None  # (shot index, frame index) while showing the model through a show camera
+        self.ref_style = "wire"
+        self.foot_cache = None
+        # metres per file unit for the footage cameras: the project's .glb exports are in studs
+        in_project = bool(self.refs) and not os.environ.get("MESHVIEW_REFS")
+        default_unit = STUD_M if in_project and Path(model).suffix.lower() == ".glb" else 1.0
+        self.unit_m = float(os.environ.get("MESHVIEW_UNIT_M", default_unit))
         self.glb = self.model
         if self.model.suffix.lower() == ".blend":
             cache = Path(tempfile.gettempdir()) / "meshview"
@@ -989,6 +1107,11 @@ class Viewer:
                 return False
             if self.message.endswith(" view"):
                 self.message = ""
+            if k in ("r", "[", "]", "{", "}", "o"):
+                return self.ref_key(k)
+            if self.ref is not None and k in ("h", "j", "k", "l", "H", "J", "K", "L", "left", "right", "up",
+                                               "down", "+", "=", "-", "_", "f", "v"):
+                self.leave_ref()
             if k in ("h", "left"):
                 self.cam.orbit(step, 0); self.spin = False
             elif k in ("l", "right"):
@@ -1027,6 +1150,7 @@ class Viewer:
         elif ev[0] == "mouse":
             _, b, x, y, pressed = ev
             if b in (64, 65):
+                self.leave_ref()
                 self.cam.zoom(0.9 if b == 64 else 1 / 0.9)
                 self.interact()
             elif pressed and not (b & 32):
@@ -1035,6 +1159,7 @@ class Viewer:
             elif pressed and (b & 32) and self.drag:
                 btn, px, py = self.drag
                 self.dragged = True
+                self.leave_ref()
                 dx, dy = x - px, y - py
                 if btn == 0 and not (b & 4):  # left drag: orbit, like Blender's MMB
                     self.cam.orbit(-dx * math.radians(2.5), dy * math.radians(4))
@@ -1048,6 +1173,108 @@ class Viewer:
                     self.pick_at(x, y)
                 self.drag = None
         return True
+
+    # ─── reference footage ──────────────────────────────────────────────────
+    def ref_shot(self, i=None):
+        i = self.ref[0] if i is None else i
+        if i not in self.ref_shots:
+            self.ref_shots[i] = RefShot(self.refs[i])
+        return self.ref_shots[i]
+
+    def ref_info(self):
+        if self.ref is None:
+            return None
+        shot = self.ref_shot()
+        return {"shot": shot.name, "frame": shot.frames[self.ref[1]][0], "index": self.ref[1] + 1,
+                "frames": len(shot.frames), "style": self.ref_style, "unit_m": self.unit_m}
+
+    def enter_ref(self, shot, frame=None):
+        n = len(self.ref_shot(shot).frames)
+        self.ref = (shot, (n // 2 if frame is None else frame) % n)
+        self.spin = False
+        self.interact()
+
+    def leave_ref(self):
+        if self.ref is not None:
+            self.ref = None
+            self.message = "left the footage view"
+
+    def ref_key(self, k):
+        if not self.refs:
+            self.message = "no reference footage for this model"
+        elif k == "r":
+            if self.ref is None:
+                self.enter_ref(0)
+            else:
+                self.leave_ref()
+        elif self.ref is None:
+            self.enter_ref(0)
+        elif k in "[]":
+            self.enter_ref(self.ref[0], self.ref[1] + (1 if k == "]" else -1))
+        elif k in "{}":
+            self.enter_ref((self.ref[0] + (1 if k == "}" else -1)) % len(self.refs))
+        elif k == "o":
+            styles = ["wire", "ghost", "model"]
+            self.ref_style = styles[(styles.index(self.ref_style) + 1) % len(styles)]
+        self.interact()
+        return True
+
+    def ref_view(self, W, H):
+        """The footage camera letterboxed into W x H: (rw, rh, x offset, y offset, (eye, view, vp))."""
+        shot = self.ref_shot()
+        sw, sh = shot.size
+        k = min(W / sw, H / sh)
+        rw, rh = max(16, int(sw * k)), max(16, int(sh * k))
+        f, cx, cy = shot.K["f"] * rw / sw, shot.K["cx"] * rw / sw, shot.K["cy"] * rh / sh
+        R, t = shot.camera(self.ref[1])
+        center, radius = self.xform
+        A = np.identity(4)
+        A[:3, :3] *= radius
+        A[:3, 3] = center  # viewer -> file
+        B = np.array([[1, 0, 0, 0], [0, 0, -1, 0], [0, 1, 0, 0], [0, 0, 0, 1]], dtype=np.float64)  # glTF -> Blender
+        S = np.diag([self.unit_m] * 3 + [1.0])  # file units -> metres
+        C = np.identity(4)
+        C[:3, :3], C[:3, 3] = R, t  # build frame -> COLMAP camera
+        view = np.diag([1.0, -1.0, -1.0, 1.0]) @ C @ S @ B @ A  # -> OpenGL camera
+        near, far = 0.05, 500.0
+        proj = np.array([
+            [2 * f / rw, 0, 1 - 2 * cx / rw, 0],
+            [0, 2 * f / rh, 2 * cy / rh - 1, 0],
+            [0, 0, -(far + near) / (far - near), -2 * far * near / (far - near)],
+            [0, 0, -1, 0],
+        ])
+        eye = (np.linalg.inv(view) @ np.array([0, 0, 0, 1.0]))[:3]
+        return rw, rh, (W - rw) // 2, (H - rh) // 2, (eye, view, proj @ view)
+
+    def footage(self, rw, rh):
+        key = (self.ref, rw, rh)
+        if not self.foot_cache or self.foot_cache[0] != key:
+            from PIL import Image
+
+            img = self.ref_shot().image(self.ref[1])
+            img = Image.fromarray((img * 255).astype(np.uint8)).resize((rw, rh), Image.BILINEAR)
+            self.foot_cache = (key, np.asarray(img, dtype=np.float32) / 255)
+        return self.foot_cache[1]
+
+    def compose(self, W, H, draw_mode, quality):
+        """The pane's picture: the model from the orbit camera, or laid over a footage frame."""
+        if self.ref is None:
+            return self.renderer.render(self.cam, draw_mode, W, H, self.wire, self.grid, quality, self.markers())
+        rw, rh, ox, oy, ov = self.ref_view(W, H)
+        layer = self.renderer.render(self.cam, draw_mode, rw, rh, self.wire, False, True, self.markers(),
+                                     override=ov, layer="wire" if self.ref_style == "wire" else "shaded")
+        layer = layer.astype(np.float32) / 255
+        rgb, a = layer[..., :3], layer[..., 3:4]
+        if self.ref_style == "model":
+            under = np.array(BG_BOTTOM, dtype=np.float32) * 2
+        else:
+            under = self.footage(rw, rh)
+            if self.ref_style == "ghost":
+                a = a * 0.55
+        canvas = np.empty((H, W, 3), dtype=np.float32)
+        canvas[:] = BG_BOTTOM
+        canvas[oy:oy + rh, ox:ox + rw] = under * (1 - a) + rgb * a
+        return (np.clip(canvas, 0, 1) * 255).astype(np.uint8)
 
     # ─── coordinates: viewer space <-> file (glTF, Y up) <-> Blender (Z up) ───
     def to_file(self, p):
@@ -1090,7 +1317,14 @@ class Viewer:
             return
         w, h = max(16, int(cols * cw)), max(16, int(img_rows * ch))
         px, py = min(w - 1, int((x - 0.5) * cw)), min(h - 1, int((y - 0.5) * ch))
-        hit = self.renderer.pick(self.cam, w, h, px, py)
+        if self.ref is not None:
+            rw, rh, ox, oy, ov = self.ref_view(w, h)
+            px, py = px - ox, py - oy
+            if not (0 <= px < rw and 0 <= py < rh):
+                return
+            hit = self.renderer.pick(self.cam, rw, rh, px, py, override=ov)
+        else:
+            hit = self.renderer.pick(self.cam, w, h, px, py)
         self.spin = False
         if hit is None:
             self.click = {"object": None, "camera": self.camera_info(), "time": time.time()}
@@ -1105,6 +1339,7 @@ class Viewer:
                 "point": self.to_blender(p),
                 "camera": self.camera_info(),
                 "mode": MODES[self.mode],
+                "footage": self.ref_info(),
                 "time": time.time(),
             }
             self.click_mark = p
@@ -1143,6 +1378,8 @@ class Viewer:
                 "look [from=X,Y,Z] [at=X,Y,Z]": "put the camera at / aim it at points",
                 "mark X,Y,Z | mark NAME | mark clear": "gold ring at a point or an object's centre",
                 "snapshot PATH [size=WxH]": "render the current view to a PNG",
+                "ref list | ref SHOT [FRAME] | ref next|prev [shot] | ref off": "the model through a solved show camera, over that frame",
+                "ref style wire|ghost|model | ref unit METRES_PER_UNIT | ref dir PATH": "overlay look; file units; where the placed shots are",
             }, "coords": "Blender (Z up), file units"}
         if cmd == "state":
             return {
@@ -1152,6 +1389,7 @@ class Viewer:
                 "camera": self.camera_info(),
                 "click": self.click,
                 "mark": self.to_blender(self.claude_mark) if self.claude_mark is not None else None,
+                "footage": self.ref_info(),
                 "stats": self.stats and {k: v for k, v in self.stats.items() if k != "textures"},
                 "coords": "Blender (Z up), file units",
             }
@@ -1165,6 +1403,8 @@ class Viewer:
             return {"objects": out}
         if cmd == "click":
             return {"click": self.click}
+        if cmd == "ref":
+            return self.ref_command(pos, kw)
 
         # everything below changes the view
         self.interact()
@@ -1235,12 +1475,57 @@ class Viewer:
                 _, _, _, b = self.cam.anim
                 self.cam.yaw, self.cam.pitch, self.cam.dist, self.cam.target = b
                 self.cam.anim = None
-            img = self.renderer.render(self.cam, self.mode, w, h, self.wire, self.grid, True, self.markers())
+            img = self.compose(w, h, self.mode, True)
             Image.fromarray(img).save(pos[0])
             return {"ok": True, "path": pos[0], "camera": self.camera_info()}
         else:
             return {"error": f"unknown command {cmd!r}"}
         return {"ok": True, "camera": self.camera_info()}
+
+    def ref_command(self, pos, kw):
+        sub = pos[0] if pos else "list"
+        if sub == "dir":
+            self.refs, self.ref_shots, self.ref = shots_in(pos[1]), {}, None
+            return {"ok": True, "shots": [p.name for p in self.refs]}
+        if sub == "unit":
+            self.unit_m = float(pos[1])
+            self.interact()
+            return {"ok": True, "unit_m": self.unit_m}
+        if sub == "style":
+            self.ref_style = pos[1]
+            self.interact()
+            return {"ok": True, "footage": self.ref_info()}
+        if sub == "off":
+            self.leave_ref()
+            self.interact()
+            return {"ok": True}
+        if not self.refs:
+            return {"error": "no placed shots found; use: ref dir <observations/place>"}
+        if sub == "list":
+            return {"shots": [{"shot": p.name, "frames": len(self.ref_shot(i).frames)} for i, p in enumerate(self.refs)],
+                    "unit_m": self.unit_m, "current": self.ref_info()}
+        if sub in ("next", "prev"):
+            d = 1 if sub == "next" else -1
+            if self.ref is None:
+                self.enter_ref(0)
+            elif pos[1:2] == ["shot"]:
+                self.enter_ref((self.ref[0] + d) % len(self.refs))
+            else:
+                self.enter_ref(self.ref[0], self.ref[1] + d)
+            return {"ok": True, "footage": self.ref_info()}
+        names = [p.name for p in self.refs]
+        match = [i for i, n in enumerate(names) if n == sub] or [i for i, n in enumerate(names) if sub in n]
+        if not match:
+            return {"error": f"no shot matching {sub!r}", "shots": names}
+        frame = None
+        if len(pos) > 1:
+            frames = [f[0] for f in self.ref_shot(match[0]).frames]
+            want = pos[1]
+            frame = next((j for j, n in enumerate(frames) if Path(n).stem == want.zfill(4) or n == want), None)
+            if frame is None:
+                return {"error": f"no frame {want!r} in {names[match[0]]}", "first": frames[0], "last": frames[-1]}
+        self.enter_ref(match[0], frame)
+        return {"ok": True, "footage": self.ref_info()}
 
     def markers(self):
         m = []
@@ -1302,13 +1587,23 @@ class Viewer:
             f"\x1b[38;2;{TEAL};1m ◆ {mode}\x1b[22m",
             f"\x1b[38;2;{GOLD}m{'⟳ ' if self.spin else ''}\x1b[38;2;{FG}m{self.model.name}",
         ]
+        plain = f" ◆ {mode}  {'⟳ ' if self.spin else ''}{self.model.name}"
+        if self.ref is not None:
+            r = self.ref_info()
+            ref = f"▣ {r['shot']} {r['index']}/{r['frames']} {r['style']}"
+            bits.append(f"\x1b[38;2;{TEAL}m{ref}")
+            plain += "  " + ref
         if self.message:
             bits.append(f"\x1b[38;2;{GOLD}m{self.message}")
+            plain += "  " + self.message
         left = "  ".join(bits)
-        keys = "1 2 3 mode  space spin  z wire  g grid  v view  f frame  q quit"
-        visible_len = len(f" ◆ {mode}  {'⟳ ' if self.spin else ''}{self.model.name}") + (
-            len(self.message) + 2 if self.message else 0
-        )
+        if self.ref is not None:
+            keys = "[ ] frame  { } shot  o overlay  r back  q quit"
+        elif self.refs:
+            keys = "1 2 3 mode  space spin  z wire  v view  r footage  q quit"
+        else:
+            keys = "1 2 3 mode  space spin  z wire  g grid  v view  f frame  q quit"
+        visible_len = len(plain)
         if visible_len + len(keys) + 4 <= cols:
             left += " " * (cols - visible_len - len(keys) - 1) + f"\x1b[38;2;{DIM}m{keys}"
         return left
@@ -1357,7 +1652,7 @@ class Viewer:
 
                 now = time.time()
                 dt, last = now - last, now
-                animating = self.spin and self.mode != 2 and self.visible and self.renderer.parts
+                animating = self.spin and self.mode != 2 and self.visible and self.renderer.parts and self.ref is None
                 if animating:
                     self.cam.orbit(SPIN_SPEED * min(dt, 0.1), 0)
                     self.dirty = True
@@ -1381,8 +1676,7 @@ class Viewer:
                     draw_mode = self.mode if (self.mode != 2 or quality) else 1
                     t0 = time.time()
                     if self.renderer.parts:
-                        img = self.renderer.render(self.cam, draw_mode, w, h, self.wire, self.grid, quality,
-                                                   self.markers())
+                        img = self.compose(w, h, draw_mode, quality)
                         regrid = screen.grid != (cols, img_rows)
                         screen.show(img, cols, img_rows)
                         log("frame", w, h, "regrid", regrid, "panel", self.panel_dirty)

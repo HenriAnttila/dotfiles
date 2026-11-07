@@ -81,6 +81,34 @@ meshview ctl help
 Camera moves glide over about half a second so the user can follow them, and
 stop the spin.
 
+## The model over the show footage (coral room)
+
+For a model in a project with placed shots (`observations/place/<shot>/` with
+`placement.json` and a COLMAP `solve/`, found in any folder above the model),
+the pane can show the model through a solved show camera, over that frame
+(undistorted), letterboxed at the shot's 16:9:
+
+```sh
+meshview ctl ref list                    # placed shots and frame counts
+meshview ctl ref fear_her 40             # shot (name or part of it), frame number
+meshview ctl ref style wire|ghost|model  # hidden-line wireframe over the frame / half-shaded / model only
+meshview ctl ref next | ref next shot | ref off
+meshview ctl snapshot /tmp/x.png         # the overlay as the pane shows it: read it to judge the fit
+```
+
+The user's keys: r footage on/off, [ ] frame, { } shot, o overlay style;
+orbiting leaves it. A click in footage view picks through the show camera and
+the click says which frame.
+
+Only a model **in room coordinates** lines up: room.glb does, but part files
+built at the origin (seat.glb, pillar.glb) don't, and look misplaced over the
+footage; say so rather than calling it a mismatch. The project's .glb files are
+in studs and are read at 0.28 m each; a preview exported from live Blender is in
+metres and has no project folder above it, so set both:
+`meshview ctl ref dir ~/Code/HenriAnttila/Coral/observations/place` then
+`meshview ctl ref unit 1`. This is for looking; the coral-frame-analysis skill's
+review rounds stay the way to decide a part matches.
+
 ## Checking a model yourself
 
 You cannot see the pane. To look at the model, render a snapshot and read the
