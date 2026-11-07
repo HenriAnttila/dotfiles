@@ -44,6 +44,43 @@ selection. This preview export is not the project's real export: when the model
 has a .glb the project already exports (roblox-mesh-export), show that file
 rather than writing over it with these settings.
 
+## When the user points at something
+
+Clicking the model (without dragging) picks a spot: a teal ring marks it and
+the pane says what was picked. When the user says "this", "here", "that bit"
+or "what I clicked" while a preview is open, read the click before answering:
+
+```sh
+meshview ctl click
+```
+
+It gives the object name, triangle index, the 3D point, and the camera at the
+time, all in **Blender coordinates (Z up, file units)**, the same space you
+work in through the Blender MCP. If the click is old or `null`, ask them to
+click the spot.
+
+## Driving the pane
+
+`meshview ctl <command>` talks to the meshview pane in this tmux window and
+prints JSON. Show, don't describe: when you explain a part, fly the camera to
+it and mark it.
+
+```sh
+meshview ctl frame <name>          # fly to fit objects whose name contains <name>; no name: whole model
+meshview ctl view top              # front back left right top bottom
+meshview ctl look from=X,Y,Z at=X,Y,Z
+meshview ctl orbit 45 10           # degrees; zoom 2 = twice as close
+meshview ctl mark <name>|X,Y,Z     # gold ring where you mean; mark clear removes it
+meshview ctl mode render           # solid material render; wire/grid/spin [on|off]
+meshview ctl objects               # every object with tris and Blender-space bounds
+meshview ctl state                 # mode, camera, click, mark, stats
+meshview ctl snapshot /tmp/x.png   # exactly what the pane shows, to read yourself
+meshview ctl help
+```
+
+Camera moves glide over about half a second so the user can follow them, and
+stop the spin.
+
 ## Checking a model yourself
 
 You cannot see the pane. To look at the model, render a snapshot and read the
