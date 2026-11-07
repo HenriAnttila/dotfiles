@@ -1,6 +1,6 @@
 ---
 name: model-preview
-description: Show the user a 3D model in a live preview pane (meshview) beside this conversation in their tmux, opening the split if it isn't open yet. Use when the user asks to see, show, preview or look at a model or mesh (a .glb, .gltf, .obj, .stl, .ply or .blend, or what is in Blender right now), and after you build, change or export a model in Blender so they can watch it update. Also gives you a way to check a model yourself with a rendered snapshot.
+description: Show the user a 3D model in a live preview pane (meshview) beside this conversation in their tmux, opening the split if it isn't open yet, and keep it on what the conversation is about. Use when the user asks to see, show, preview or look at a model or mesh (a .glb, .gltf, .obj, .stl, .ply or .blend, or what is in Blender right now), when they name a part of a model to work on ("let's edit the chair", "the pillars look off"), and after you build, change or export a model so they can watch it update. Also gives you a way to check a model yourself with a rendered snapshot.
 ---
 
 The user's tmux has `meshview`, a GPU model viewer that runs in a pane: the
@@ -24,6 +24,23 @@ which takes a few seconds).
 
 Tell the user the preview is open, and that they click into the pane to drive
 it and press q there to close it.
+
+## Keep the preview on what you're talking about
+
+When the user names a part to work on ("let's edit the chair", "fix the
+pillars"), put it in focus without being asked, before you start on the code:
+
+1. If no preview is open, or it shows a file without that part, show the file
+   that has it (`show.sh`).
+2. `meshview ctl objects` and find the objects that are that part. Names won't
+   match the user's words (the chair may be `Seat_Base`, `Seat_Pads`, ...), so
+   match by meaning, and ask only if two parts could be meant.
+3. `meshview ctl frame <name or shared prefix>` flies to fit them and stops
+   the spin; `meshview ctl mark <object>` when one piece is meant.
+4. Say in a line what is in view ("the seat: base, pads, post, footrest").
+
+Keep it there while you work: after each change, frame the part again so the
+user sees it, and move the view when the conversation moves to another part.
 
 ## A model that only exists in Blender
 
