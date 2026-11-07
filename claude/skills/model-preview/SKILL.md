@@ -53,6 +53,12 @@ PNG:
 meshview --snapshot /tmp/<name>.png --mode solid|material|render <model file>
 ```
 
+For numbers, `meshview --stats <model file>` prints JSON: tris, verts,
+objects, materials, size (x, y, z), unit, textures (each WxH) and
+texture_bytes (GPU memory with mipmaps). The pane shows the same in its
+top-left corner. The project's exports treat 1 stud as 1 metre, so a .glb's
+"m" there is studs.
+
 ## Closing it
 
 `tmux kill-pane -t <pane id>`, only when the user asks.

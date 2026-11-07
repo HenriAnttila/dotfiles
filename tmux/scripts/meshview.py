@@ -7,6 +7,7 @@
 
     meshview MODEL            view MODEL in this pane
     meshview --split MODEL    open a tmux split beside this pane and view it there
+    meshview --stats MODEL    print the model's statistics as JSON
     meshview --snapshot OUT.png [--mode solid|material|render] MODEL
                               render one frame to a PNG and exit (no terminal)
 
@@ -55,6 +56,7 @@ TEAL = "70;225;205"
 FG = "185;214;211"
 DIM = "63;105;102"
 GOLD = "217;181;108"
+PANEL_BG = "7;20;23"
 
 
 # ─── math ────────────────────────────────────────────────────────────────────
@@ -117,6 +119,9 @@ def load_model(path):
 
     scene = trimesh.load(str(path), force="scene", process=False)
     raw = []
+    materials, textures = set(), {}  # textures: id -> (w, h)
+    tex_slots = ("baseColorTexture", "normalTexture", "metallicRoughnessTexture",
+                 "emissiveTexture", "occlusionTexture", "image")
     for node in scene.graph.nodes_geometry:
         T, gname = scene.graph[node]
         g = scene.geometry.get(gname)
@@ -135,6 +140,12 @@ def load_model(path):
             if getattr(vis, "uv", None) is not None and len(vis.uv) == n:
                 uv = np.asarray(vis.uv, dtype=np.float64)
             mat = vis.material
+            if mat is not None:
+                materials.add(id(mat))
+                for slot in tex_slots:
+                    img = getattr(mat, slot, None)
+                    if img is not None and hasattr(img, "size"):
+                        textures[id(img)] = img.size
             if isinstance(mat, PBRMaterial):
                 if mat.baseColorFactor is not None:
                     b = np.asarray(mat.baseColorFactor, dtype=np.float64)
@@ -157,14 +168,25 @@ def load_model(path):
     lo, hi = allpos.min(0), allpos.max(0)
     center = (lo + hi) / 2
     radius = max(np.linalg.norm(hi - lo) / 2, 1e-9)
-    parts, tris = [], 0
+    parts = []
     for pos, nrm, uv, col, faces, base, tex, metal, rough in raw:
         p = (pos - center) / radius
         verts = np.hstack([p, nrm, uv, col]).astype("f4")
         parts.append(Part(verts, faces, base, tex, metal, rough))
-        tris += len(faces)
     ground = float(((lo - center) / radius)[1])
-    return parts, ground, tris
+    stats = {
+        "tris": sum(len(r[4]) for r in raw),
+        "verts": sum(len(r[0]) for r in raw),
+        "objects": len(raw),
+        "materials": len(materials),
+        "size": [float(x) for x in hi - lo],
+        # glTF is in metres; other formats carry no unit
+        "unit": "m" if Path(path).suffix.lower() in (".glb", ".gltf") else "",
+        "textures": sorted(textures.values(), key=lambda wh: -wh[0] * wh[1]),
+        # GPU memory as RGBA8 with a full mip chain (+1/3)
+        "texture_bytes": int(sum(w * h * 4 * 4 / 3 for w, h in textures.values())),
+    }
+    return parts, ground, stats
 
 
 def export_blend(blend, out):
@@ -694,6 +716,55 @@ def parse_input(buf):
     return events
 
 
+# ─── statistics panel ────────────────────────────────────────────────────────
+def fmt_num(v):
+    return f"{v:,.0f}" if abs(v) >= 100 else f"{v:.3g}"
+
+
+def fmt_bytes(n):
+    return f"{n / 2**20:.1f} MB" if n >= 2**20 else f"{n / 2**10:.0f} KB"
+
+
+def stats_rows(st):
+    """Rows of (text, color) segments for the corner panel."""
+    v, d = FG, DIM
+    sx, sy, sz = st["size"]
+    unit = f" {st['unit']}" if st["unit"] else ""
+    rows = [
+        [(f"{st['tris']:,}", v), (" tris  ", d), (f"{st['verts']:,}", v), (" verts", d)],
+        [(f"{st['objects']}", v), (" objects  ", d), (f"{st['materials']}", v), (" materials", d)],
+        [(f"{fmt_num(sx)} × {fmt_num(sy)} × {fmt_num(sz)}", v), (unit, d)],
+    ]
+    tex = st["textures"]
+    if tex:
+        counts = {}
+        for w, h in tex:
+            counts[f"{w}×{h}"] = counts.get(f"{w}×{h}", 0) + 1
+        rows.append([(f"{len(tex)}", v), (" textures  ", d), (fmt_bytes(st["texture_bytes"]), v)])
+        sizes = [(f"{n}× " if n > 1 else "", d) for n in counts.values()]
+        row = []
+        for (prefix, _), size in zip(sizes, counts):
+            row += [(prefix, d), (size, v), ("  ", d)]
+        rows.append(row[:-1])
+    else:
+        rows.append([("no textures", d)])
+    return rows
+
+
+def render_panel(rows, cols):
+    """ANSI for the panel at the top-left, clipped to the pane width."""
+    width = min(max(sum(len(t) for t, _ in r) for r in rows) + 2, cols)
+    out = []
+    for i, row in enumerate(rows):
+        line, used = "", 1
+        for text, color in row:
+            text = text[: max(0, width - 1 - used)]
+            line += f"\x1b[38;2;{color}m{text}"
+            used += len(text)
+        out.append(f"\x1b[{i + 1};1H\x1b[48;2;{PANEL_BG}m " + line + " " * max(0, width - used) + "\x1b[0m")
+    return "".join(out)
+
+
 # ─── app ─────────────────────────────────────────────────────────────────────
 class Viewer:
     def __init__(self, model):
@@ -709,7 +780,8 @@ class Viewer:
         self.last_input = 0.0
         self.refined = False
         self.message = ""
-        self.tris = 0
+        self.stats = None
+        self.panel_dirty = True
         self.loaded_mtime = None
         self.export_proc = None
         self.drag = None
@@ -763,14 +835,16 @@ class Viewer:
 
     def load(self, mtime):
         try:
-            parts, ground, tris = load_model(self.glb)
+            parts, ground, stats = load_model(self.glb)
         except Exception as e:  # keep showing the last good model
             self.message = f"load failed: {e}"[:80]
             self.loaded_mtime = mtime
             self.dirty = True
             return
         self.renderer.upload(parts, ground)
-        self.tris = tris
+        log("loaded", stats["tris"])
+        self.stats = stats
+        self.panel_dirty = True
         self.loaded_mtime = mtime
         self.message = ""
         self.dirty = True
@@ -858,6 +932,8 @@ class Viewer:
             vis = r.stdout.strip().startswith("1") and not r.stdout.strip().endswith("0")
         except Exception:
             vis = True
+        if vis != self.visible:
+            log("visible", vis, repr(r.stdout) if "r" in dir() else "")
         if vis and not self.visible:
             self.dirty = True
             self.refined = False
@@ -868,13 +944,12 @@ class Viewer:
         bits = [
             f"\x1b[38;2;{TEAL};1m ◆ {mode}\x1b[22m",
             f"\x1b[38;2;{GOLD}m{'⟳ ' if self.spin else ''}\x1b[38;2;{FG}m{self.model.name}",
-            f"\x1b[38;2;{DIM}m{self.tris:,} tris",
         ]
         if self.message:
             bits.append(f"\x1b[38;2;{GOLD}m{self.message}")
         left = "  ".join(bits)
         keys = "1 2 3 mode  space spin  z wire  g grid  v view  f frame  q quit"
-        visible_len = len(f" ◆ {mode}  {'⟳ ' if self.spin else ''}{self.model.name}  {self.tris:,} tris") + (
+        visible_len = len(f" ◆ {mode}  {'⟳ ' if self.spin else ''}{self.model.name}") + (
             len(self.message) + 2 if self.message else 0
         )
         if visible_len + len(keys) + 4 <= cols:
@@ -900,6 +975,7 @@ class Viewer:
                 if resized[0]:
                     resized[0] = False
                     cols, rows, cw, ch = screen.size()
+                    log("size", cols, rows, cw, ch)
                     screen.write("\x1b[2J")
                     screen.grid = None
                     status_shown = None
@@ -932,7 +1008,12 @@ class Viewer:
                     t0 = time.time()
                     if self.renderer.parts:
                         img = self.renderer.render(self.cam, draw_mode, w, h, self.wire, self.grid, quality)
+                        regrid = screen.grid != (cols, img_rows)
                         screen.show(img, cols, img_rows)
+                        log("frame", w, h, "regrid", regrid, "panel", self.panel_dirty)
+                        if (regrid or self.panel_dirty) and self.stats:
+                            screen.write(render_panel(stats_rows(self.stats), cols))
+                            self.panel_dirty = False
                     fps = 0.8 * fps + 0.2 / max(time.time() - t0, 1e-3)
                     if want_refine:
                         self.refined = True
@@ -955,6 +1036,12 @@ class Viewer:
             termios.tcsetattr(fd_in, termios.TCSADRAIN, old)
 
 
+def log(*a):
+    if os.environ.get("MESHVIEW_LOG"):
+        with open(os.environ["MESHVIEW_LOG"], "a") as f:
+            print(f"{time.time():.3f}", *a, file=f)
+
+
 def main():
     args = sys.argv[1:]
     if not args or args[0] in ("-h", "--help"):
@@ -968,6 +1055,19 @@ def main():
         me = shutil.which("meshview") or str(Path(__file__).resolve())
         subprocess.run(["tmux", "split-window", "-h", "-c", str(model.parent), me, str(model)])
         return 0
+    if args[0] == "--stats":
+        import json
+
+        model = Path(args[1]).resolve()
+        glb = model
+        if model.suffix.lower() == ".blend":
+            glb = Path(tempfile.gettempdir()) / "meshview" / (model.stem + "-stats.glb")
+            glb.parent.mkdir(exist_ok=True)
+            export_blend(model, glb).wait()
+        _, _, stats = load_model(glb)
+        stats["textures"] = [f"{w}x{h}" for w, h in stats["textures"]]
+        print(json.dumps(stats, indent=2))
+        return 0
     if args[0] == "--snapshot":
         out, rest = args[1], args[2:]
         mode = "material"
@@ -977,13 +1077,13 @@ def main():
         if v.model != v.glb:
             p = export_blend(v.model, v.glb)
             p.wait()
-        parts, ground, tris = load_model(v.glb)
+        parts, ground, stats = load_model(v.glb)
         v.renderer.upload(parts, ground)
         img = v.renderer.render(v.cam, MODES.index(mode), 1280, 800, False, True, True)
         from PIL import Image
 
         Image.fromarray(img).save(out)
-        print(f"{tris:,} tris -> {out}")
+        print(f"{stats['tris']:,} tris -> {out}")
         return 0
     Viewer(args[0]).run()
     return 0
