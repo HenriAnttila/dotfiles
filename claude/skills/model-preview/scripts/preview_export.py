@@ -1,9 +1,9 @@
 # Runs inside headless Blender on a project .blend, never saving it:
 #   blender -b <file.blend> --python preview_export.py -- <out.glb> [<script.py> ...] [arg ...]
-# Each script runs in order on the open file, as the project's tools/apply_*.py run in a
-# live Blender (exec with their own __file__); args that aren't .py files stay in sys.argv
-# for them to read (parts=Seat_Base,...). --no-save is forced so they can't write the
-# .blend. Then the visible scene is exported to <out.glb>: metres, the file's own frame.
+# Each script runs in order on the open file, exec'd with its own __file__ as if run in a
+# live Blender; args that aren't .py files stay in sys.argv for the scripts to read, and
+# --no-save is added for scripts that check it. Then the visible scene is exported to
+# <out.glb> in the .blend's own units and frame.
 import os
 import sys
 

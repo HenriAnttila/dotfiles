@@ -1,12 +1,11 @@
 #!/bin/sh
 # preview_build.sh BLEND [SCRIPT.py ...] [ARG ...]
 #
-# A preview .glb of a project .blend, optionally after running the project's
-# scripts on it (tools/apply_seat_parts.py parts=Seat_Pads ...), without ever
-# saving the .blend: the scripts run with --no-save forced and the file's
+# A preview .glb of a .blend, optionally after running scripts on it, meant
+# not to save the .blend: --no-save is passed to the scripts and the file's
 # modification time is checked afterwards. Writes ~/.cache/meshview/<name>.glb
-# (metres, the .blend's own frame) and prints its path. Blender's output goes to
-# ~/.cache/meshview/<name>.log.
+# (the .blend's own units and frame) and prints its path. Blender's output goes
+# to ~/.cache/meshview/<name>.log.
 set -eu
 
 [ $# -ge 1 ] || { echo "usage: preview_build.sh BLEND [SCRIPT.py ...] [ARG ...]" >&2; exit 2; }

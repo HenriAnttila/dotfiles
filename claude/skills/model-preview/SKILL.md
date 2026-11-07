@@ -40,9 +40,9 @@ bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", use_visible=True, 
 ```
 
 Use `use_selection=True` instead of `use_visible=True` to show only the
-selection. This preview export is not the project's real export: when the model
-has a .glb the project already exports (roblox-mesh-export), show that file
-rather than writing over it with these settings.
+selection. This preview export is not the project's real export: when the
+project already exports the model somewhere, show that file rather than
+writing over it with these settings.
 
 ## When the user points at something
 
@@ -81,77 +81,43 @@ meshview ctl help
 Camera moves glide over about half a second so the user can follow them, and
 stop the spin.
 
-## The model over the show footage (coral room)
+## A model built from a .blend by scripts
 
-For a model in a project with placed shots (`observations/place/<shot>/` with
-`placement.json` and a COLMAP `solve/`, found in any folder above the model),
-the pane can show the model through a solved show camera, over that frame
-(undistorted), letterboxed at the shot's 16:9:
+When a project builds its models with scripts that run in Blender, make changes
+in the scripts, not in an exported file. To show a change without writing the
+project's own files, export a preview from the .blend, optionally after running
+scripts on it:
 
 ```sh
-meshview ctl ref list                    # placed shots and frame counts
-meshview ctl ref fear_her 40             # shot (name or part of it), frame number
-meshview ctl ref style wire|ghost|model  # hidden-line wireframe over the frame / half-shaded / model only
+~/.claude/skills/model-preview/scripts/preview_build.sh <file.blend> [<script.py> ...] [arg ...]
+~/.claude/skills/model-preview/scripts/show.sh ~/.cache/meshview/<name>.glb   # first time only
+```
+
+It opens the .blend in headless Blender, runs the scripts in order (args that
+aren't .py files stay in `sys.argv` for them, and `--no-save` is added),
+exports the visible scene to `~/.cache/meshview/<name>.glb` in the .blend's
+own units and frame, and warns if the .blend's timestamp changed. A script that
+saves without honouring `--no-save` would still write the .blend, so read a
+script before passing it. The pane reloads when the preview file changes, so
+after the first show only re-run `preview_build.sh`. Then point at what changed
+with `meshview ctl frame` and `ctl mark`, and say what changed in words.
+
+## The model over footage
+
+When the model's project has solved footage cameras, `meshview ctl ref list`
+lists the shots, and the pane can show the model through a shot's camera over
+that frame:
+
+```sh
+meshview ctl ref <shot> <frame>          # shot name or part of it, frame number
+meshview ctl ref style wire|ghost|model  # wireframe over the frame / half-shaded / model only
 meshview ctl ref next | ref next shot | ref off
-meshview ctl snapshot /tmp/x.png         # the overlay as the pane shows it: read it to judge the fit
 ```
 
 The user's keys: r footage on/off, [ ] frame, { } shot, o overlay style;
-orbiting leaves it. A click in footage view picks through the show camera and
-the click says which frame.
-
-Only a model **in room coordinates** lines up: room.glb does, but part files
-built at the origin (seat.glb, pillar.glb) don't, and look misplaced over the
-footage; say so rather than calling it a mismatch. The project's .glb files are
-in studs and are read at 0.28 m each; a preview exported from live Blender is in
-metres and has no project folder above it, so set both:
-`meshview ctl ref dir ~/Code/HenriAnttila/Coral/observations/place` then
-`meshview ctl ref unit 1`. This is for looking; the coral-frame-analysis skill's
-review rounds stay the way to decide a part matches.
-
-## Models built by scripts (the Coral repo)
-
-The coral models are built by Python running in headless Blender, so a change
-is made in the scripts (and `findings.json`), never by hand in a .glb. Per the
-repo's README: `build_room.py` writes `room.blend` and `room.glb`;
-`build_console.py`, `build_seat.py` and `build_pillar.py` write `*_src.blend`,
-which `tools/console_bake.py` bakes. When the user asks to change a part:
-
-1. **Find its code by the object name** (from `meshview ctl click`, `ctl
-   objects`, or what they said), in the repo:
-   `grep -rln --include='*.py' -e '<name>' .`
-   - Builders are `build_*.py`, `room_parts.py`, `room_*.py` and
-     `console_build/*.py`. Generated names come from f-strings
-     (`Pillar_+30` is `f'Pillar_{slot:+d}'`), so search the prefix too.
-   - `tools/apply_*.py` are the quick path: each swaps one kind of part into a
-     room .blend from its builder as the builder is now.
-   - Other `tools/` hits (seat_check, part_match, material_compare, ...) only
-     check or render the part; they don't build it.
-   - Read the builder's header comment, and follow the repo's own rules for
-     where a number belongs (measurements with their source in `findings.json`).
-2. **Make the change** in the builder or the data.
-3. **Show it without touching the real files.** Don't run the real builds for a
-   preview: they rewrite `room.blend` and the .glb files, which Henri saves by
-   hand and other sessions use. Instead:
-
-   ```sh
-   ~/.claude/skills/model-preview/scripts/preview_build.sh <repo>/room.blend [tools/apply_<x>.py [parts=A,B]]
-   ~/.claude/skills/model-preview/scripts/show.sh ~/.cache/meshview/room.glb   # first time only
-   ```
-
-   It opens the .blend, runs the given apply scripts with saving forced off,
-   exports the visible scene to `~/.cache/meshview/room.glb` (metres, the whole
-   room with the console), and checks the .blend's timestamp is unchanged.
-   That takes about 5 s plain, 8 s with `apply_seat_parts.py`. The pane reloads
-   when that file changes, so after the first show only re-run
-   `preview_build.sh`. Footage view (`r`, `ctl ref`) works on it with no setup.
-4. **Point at what changed:** `meshview ctl frame <part>` and
-   `meshview ctl mark <object>`, and say in words what changed ("the pads sit
-   2 cm higher").
-
-If the part has no apply script, the preview needs that part's real build:
-say which files the build would rewrite and ask before running it. Run the real
-builds only when Henri asks.
+orbiting leaves it. A click in footage view picks through that camera. Only a
+model exported in the same frame as the cameras lines up; a part exported at
+the origin will look misplaced, so say that rather than calling it a mismatch.
 
 ## Checking a model yourself
 
@@ -165,8 +131,7 @@ meshview --snapshot /tmp/<name>.png --mode solid|material|render <model file>
 For numbers, `meshview --stats <model file>` prints JSON: tris, verts,
 objects, materials, size (x, y, z), unit, textures (each WxH) and
 texture_bytes (GPU memory with mipmaps). The pane shows the same in its
-top-left corner. The project's exports treat 1 stud as 1 metre, so a .glb's
-"m" there is studs.
+top-left corner. "m" is the glTF convention; the file may use another unit.
 
 ## Closing it
 
