@@ -1307,6 +1307,9 @@ class Viewer:
     def enter_ref(self, shot, frame=None, play=False):
         n = len(self.ref_shot(shot).frames)
         self.ref = (shot, (n // 2 if frame is None else frame) % n)
+        if self.ref is not None and getattr(self, "_panel_for_ref", None) is None:
+            self.panel_clear = True  # entering footage view: redraw the picture where the panel was
+        self._panel_for_ref = True
         self.ref_play = play
         self.ref_t = time.time()
         self.spin = False
@@ -1329,6 +1332,8 @@ class Viewer:
     def leave_ref(self):
         if self.ref is not None:
             self.ref = None
+            self._panel_for_ref = None
+            self.panel_dirty = True  # back from footage view: the panel returns
             self.message = "left the footage view"
 
     def ref_key(self, k):
@@ -1956,7 +1961,7 @@ class Viewer:
                         regrid = screen.grid != (cols, img_rows)
                         screen.show(img, cols, img_rows)
                         log("frame", w, h, "regrid", regrid, "panel", self.panel_dirty)
-                        if (regrid or self.panel_dirty) and self.stats:
+                        if (regrid or self.panel_dirty) and self.stats and self.ref is None:  # no panel over the footage
                             if getattr(self, "focus", None):
                                 rows_ = stats_rows(self.focus_stats(), f"◎ {self.focus_label}", self.unit_m)
                             else:
