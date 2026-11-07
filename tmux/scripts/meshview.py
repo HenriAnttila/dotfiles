@@ -542,8 +542,9 @@ class Renderer:
         for dy, dx in ((0, 1), (1, 0)):
             a_ids, b_ids = ids[: h - dy, : w - dx], ids[dy:, dx:]
             a_d, b_d = dist[: h - dy, : w - dx], dist[dy:, dx:]
-            near = np.minimum(a_d, b_d)
-            jump = np.abs(np.where(np.isfinite(a_d) & np.isfinite(b_d), a_d - b_d, 0)) > 0.04 * np.where(np.isfinite(near), near, 1)
+            both = np.isfinite(a_d) & np.isfinite(b_d)  # background is infinitely far: no jump to measure there
+            with np.errstate(invalid="ignore"):
+                jump = both & (np.abs(np.where(both, a_d, 0) - np.where(both, b_d, 0)) > 0.04 * np.where(both, np.minimum(a_d, b_d), 1))
             e = (a_ids != b_ids) | jump
             edge[: h - dy, : w - dx] |= e
         out = np.zeros((h, w, 4), dtype=np.uint8)
@@ -1810,6 +1811,12 @@ class Viewer:
         return f"\x1b[38;2;{TEAL}m{left}" + " " * max(1, cols - width(left) - width(k) - 1) + f"\x1b[38;2;{DIM}m{k}"
 
     def run(self):
+        # nothing may print over the picture: warnings and tracebacks go to a log file
+        log_dir = Path.home() / ".cache" / "meshview"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        sys.stderr = open(log_dir / "meshview.log", "a", buffering=1)
+        import warnings
+        warnings.simplefilter("default")
         out = sys.stdout
         screen = Screen(out)
         fd_in = sys.stdin.fileno()
