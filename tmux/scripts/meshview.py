@@ -25,7 +25,8 @@ Keys (also shown in the pane's bottom line):
   1 2 3                     solid / material / render
   space                     spin on/off    z  wireframe   g  grid
   v                         front, right, top, back views      q  quit
-  r                         footage view on/off; in it: ← → frame, ↑ ↓ shot, o overlay
+  r                         footage view on/off: it plays like a show; any key pauses,
+                            space plays, ← → frame, ↑ ↓ shot, o overlay
 """
 
 import math
@@ -50,6 +51,7 @@ BLENDER = "/Applications/Blender.app/Contents/MacOS/Blender"
 MODES = ["solid", "material", "render"]
 SPIN_SPEED = math.radians(22)  # radians per second
 LIVE_PIXELS = 1_400_000  # max pixels per frame while spinning or dragging
+REF_FPS = 10  # footage view plays at the solved frames' own rate
 FOV = math.radians(35)
 
 # gallifrey palette (nvim/colors/gallifrey.lua)
@@ -920,6 +922,42 @@ class RefShot:
         Rz = np.array([[math.cos(turn), -math.sin(turn), 0], [math.sin(turn), math.cos(turn), 0], [0, 0, 1]])
         self.Rp, self.shift, self.scale = Rotation.from_rotvec(x[:3]).as_matrix() @ Rz, x[3:6], math.exp(x[6])
         self.cache = {}
+        self.maps = {}
+
+    def remap(self, rw, rh):
+        """For each pixel of a rw x rh straightened frame: where to read the original (bilinear)."""
+        if (rw, rh) not in self.maps:
+            K, (sw, sh) = self.K, self.size
+            v, u = np.mgrid[0:rh, 0:rw].astype(np.float32)
+            x = ((u + 0.5) * sw / rw - 0.5 - K["cx"]) / K["f"]
+            y = ((v + 0.5) * sh / rh - 0.5 - K["cy"]) / K["f"]
+            r2 = x * x + y * y
+            d = 1 + K["k1"] * r2 + K["k2"] * r2 * r2
+            su, sv = K["cx"] + K["f"] * x * d, K["cy"] + K["f"] * y * d
+            x0 = np.clip(np.floor(su).astype(np.int32), 0, sw - 2)
+            y0 = np.clip(np.floor(sv).astype(np.int32), 0, sh - 2)
+            fx = np.clip(su - x0, 0, 1)[..., None].astype(np.float32)
+            fy = np.clip(sv - y0, 0, 1)[..., None].astype(np.float32)
+            inside = ((su >= 0) & (su <= sw - 1) & (sv >= 0) & (sv <= sh - 1))[..., None]
+            nearest = (np.clip(np.rint(sv), 0, sh - 1).astype(np.int32) * sw
+                       + np.clip(np.rint(su), 0, sw - 1).astype(np.int32)).ravel()
+            self.maps[(rw, rh)] = (x0, y0, fx, fy, inside, nearest)
+        return self.maps[(rw, rh)]
+
+    def frame_at(self, i, rw, rh, fast=False):
+        """Frame i straightened to a pinhole camera, at rw x rh (float RGB 0-1).
+        fast: one read per pixel (for playback) instead of four blended."""
+        from PIL import Image
+
+        im = np.asarray(Image.open(self.path / "solve" / "images" / self.frames[i][0]).convert("RGB"))
+        x0, y0, fx, fy, inside, nearest = self.remap(rw, rh)
+        if fast:
+            out = np.take(im.reshape(-1, 3), nearest, axis=0).reshape(rh, rw, 3)
+            return out.astype(np.float32) * (inside / np.float32(255))
+        src = im.astype(np.float32) / 255
+        top = src[y0, x0] * (1 - fx) + src[y0, x0 + 1] * fx
+        bottom = src[y0 + 1, x0] * (1 - fx) + src[y0 + 1, x0 + 1] * fx
+        return (top * (1 - fy) + bottom * fy) * inside
 
     def camera(self, i):
         """Build frame (metres) -> this frame's camera (COLMAP: x right, y down, z forward)."""
@@ -1114,9 +1152,15 @@ class Viewer:
                 return False
             if self.message.endswith(" view"):
                 self.message = ""
-            if self.ref is not None:  # footage view: arrows (or h j k l) step frames and shots
+            if self.ref is not None:  # footage view: arrows (or h j k l) pause and step; space plays
                 step = {"left": "[", "h": "[", "right": "]", "l": "]", "up": "{", "k": "{", "down": "}", "j": "}"}
+                if k == " ":
+                    self.ref_play = not getattr(self, "ref_play", False)
+                    self.ref_t = time.time()
+                    self.interact()
+                    return True
                 if k in step:
+                    self.ref_play = False
                     return self.ref_key(step[k])
             if k in ("r", "[", "]", "{", "}", "o"):
                 return self.ref_key(k)
@@ -1199,11 +1243,27 @@ class Viewer:
         return {"shot": shot.name, "frame": shot.frames[self.ref[1]][0], "index": self.ref[1] + 1,
                 "frames": len(shot.frames), "style": self.ref_style, "unit_m": self.unit_m}
 
-    def enter_ref(self, shot, frame=None):
+    def enter_ref(self, shot, frame=None, play=False):
         n = len(self.ref_shot(shot).frames)
         self.ref = (shot, (n // 2 if frame is None else frame) % n)
+        self.ref_play = play
+        self.ref_t = time.time()
         self.spin = False
         self.interact()
+
+    def play_step(self, now):
+        """Footage view playing: the next frame at the shot's own rate, then on to the next shot."""
+        if self.ref is None or not getattr(self, "ref_play", False) or not self.visible:
+            return False
+        if now - self.ref_t >= 1 / REF_FPS:
+            shot, i = self.ref
+            if i + 1 < len(self.ref_shot(shot).frames):
+                self.ref = (shot, i + 1)
+            else:
+                self.ref = ((shot + 1) % len(self.refs), 0)
+            self.ref_t = now
+            self.dirty = True
+        return True
 
     def leave_ref(self):
         if self.ref is not None:
@@ -1215,7 +1275,7 @@ class Viewer:
             self.message = "no reference footage for this model"
         elif k == "r":
             if self.ref is None:
-                self.enter_ref(0)
+                self.enter_ref(0, frame=0, play=True)
             else:
                 self.leave_ref()
         elif self.ref is None:
@@ -1223,7 +1283,7 @@ class Viewer:
         elif k in "[]":
             self.enter_ref(self.ref[0], self.ref[1] + (1 if k == "]" else -1))
         elif k in "{}":
-            self.enter_ref((self.ref[0] + (1 if k == "}" else -1)) % len(self.refs))
+            self.enter_ref((self.ref[0] + (1 if k == "}" else -1)) % len(self.refs), frame=0)
         elif k == "o":
             styles = ["wire", "ghost", "model"]
             self.ref_style = styles[(styles.index(self.ref_style) + 1) % len(styles)]
@@ -1258,13 +1318,10 @@ class Viewer:
         return rw, rh, (W - rw) // 2, (H - rh) // 2, (eye, view, proj @ view)
 
     def footage(self, rw, rh):
-        key = (self.ref, rw, rh)
+        fast = getattr(self, "ref_play", False)
+        key = (self.ref, rw, rh, fast)
         if not self.foot_cache or self.foot_cache[0] != key:
-            from PIL import Image
-
-            img = self.ref_shot().image(self.ref[1])
-            img = Image.fromarray((img * 255).astype(np.uint8)).resize((rw, rh), Image.BILINEAR)
-            self.foot_cache = (key, np.asarray(img, dtype=np.float32) / 255)
+            self.foot_cache = (key, self.ref_shot().frame_at(self.ref[1], rw, rh, fast))
         return self.foot_cache[1]
 
     def compose(self, W, H, draw_mode, quality):
@@ -1321,6 +1378,7 @@ class Viewer:
     # ─── clicking ───────────────────────────────────────────────────────────
     def pick_at(self, x, y):
         """A click (no drag) at cell (x, y), 1-based: record what is under it."""
+        self.ref_play = False
         if not self.layout or not self.renderer.parts:
             return
         cols, img_rows, cw, ch = self.layout
@@ -1647,7 +1705,7 @@ class Viewer:
         plain = f" ◆ {mode}  {'⟳ ' if self.spin else ''}{self.model.name}"
         if self.ref is not None:
             r = self.ref_info()
-            ref = f"▣ {r['shot']} {r['index']}/{r['frames']} {r['style']}"
+            ref = f"{'▶' if getattr(self, 'ref_play', False) else '▣'} {r['shot']} {r['index']}/{r['frames']} {r['style']}"
             bits.append(f"\x1b[38;2;{TEAL}m{ref}")
             plain += "  " + ref
         if self.message:
@@ -1655,7 +1713,7 @@ class Viewer:
             plain += "  " + self.message
         left = "  ".join(bits)
         if self.ref is not None:
-            keys = "← → frame  ↑ ↓ shot  o overlay  r back  q quit"
+            keys = "space play/pause  ← → frame  ↑ ↓ shot  o overlay  r back  q quit"
         elif self.refs:
             keys = "1 2 3 mode  space spin  z wire  v view  r footage  q quit"
         else:
@@ -1716,6 +1774,7 @@ class Viewer:
                 flying = self.cam.step()
                 if flying:  # a camera move from Claude: quick frames until it lands
                     self.interact()
+                playing = self.play_step(now)
                 idle = now - self.last_input > 0.25
                 # render mode: quick frames while moving, one full-quality frame once you stop
                 want_refine = self.mode == 2 and idle and not self.refined
@@ -1749,7 +1808,7 @@ class Viewer:
                         status_shown = line
                     self.dirty = False
 
-                timeout = 1 / 30 if animating or flying else (0.05 if self.mode == 2 and not self.refined else 0.25)
+                timeout = 1 / 30 if animating or flying or playing else (0.05 if self.mode == 2 and not self.refined else 0.25)
                 r, _, _ = select.select([fd_in, sock], [], [], timeout)
                 if sock in r:
                     self.serve(sock)
