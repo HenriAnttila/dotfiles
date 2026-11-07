@@ -131,7 +131,7 @@ meshview ctl ref style wire|ghost|model  # wireframe over the frame / half-shade
 meshview ctl ref next | ref next shot | ref off
 ```
 
-The user's keys: r footage on/off, [ ] frame, { } shot, o overlay style;
+The user's keys: r footage on/off, ← → frame, ↑ ↓ shot, o overlay style;
 orbiting leaves it. A click in footage view picks through that camera. Only a
 model exported in the same frame as the cameras lines up; a part exported at
 the origin will look misplaced, so say that rather than calling it a mismatch.

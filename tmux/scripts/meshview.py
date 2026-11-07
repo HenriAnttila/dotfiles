@@ -25,6 +25,7 @@ Keys (also shown in the pane's bottom line):
   1 2 3                     solid / material / render
   space                     spin on/off    z  wireframe   g  grid
   v                         front, right, top, back views      q  quit
+  r                         footage view on/off; in it: ← → frame, ↑ ↓ shot, o overlay
 """
 
 import math
@@ -1113,6 +1114,10 @@ class Viewer:
                 return False
             if self.message.endswith(" view"):
                 self.message = ""
+            if self.ref is not None:  # footage view: arrows (or h j k l) step frames and shots
+                step = {"left": "[", "h": "[", "right": "]", "l": "]", "up": "{", "k": "{", "down": "}", "j": "}"}
+                if k in step:
+                    return self.ref_key(step[k])
             if k in ("r", "[", "]", "{", "}", "o"):
                 return self.ref_key(k)
             if self.ref is not None and k in ("h", "j", "k", "l", "H", "J", "K", "L", "left", "right", "up",
@@ -1383,7 +1388,7 @@ class Viewer:
                 "zoom FACTOR": "2 = twice as close",
                 "look [from=X,Y,Z] [at=X,Y,Z]": "put the camera at / aim it at points",
                 "mark X,Y,Z | mark NAME | mark clear": "gold ring at a point or an object's centre",
-                "snapshot PATH [size=WxH]": "render the current view to a PNG",
+                "snapshot PATH [view=…] [frame=NAME] [from=X,Y,Z] [at=X,Y,Z] [mode=…] [size=WxH]": "a render of its own to a PNG; the pane's view never changes",
                 "ref list | ref SHOT [FRAME] | ref next|prev [shot] | ref off": "the model through a solved show camera, over that frame",
                 "ref style wire|ghost|model | ref unit METRES_PER_UNIT | ref dir PATH": "overlay look; file units; where the placed shots are",
             }, "coords": "Blender (Z up), file units"}
@@ -1411,6 +1416,8 @@ class Viewer:
             return {"click": self.click}
         if cmd == "ref":
             return self.ref_command(pos, kw)
+        if cmd == "snapshot":
+            return self.snapshot(pos, kw)
 
         # everything below changes the view
         self.interact()
@@ -1471,22 +1478,62 @@ class Viewer:
                 self.claude_mark = self.from_file((p.lo + p.hi) / 2)
             if len(pos) > 0 and pos[0] != "clear":
                 self.message = "look at the gold ring"
-        elif cmd == "snapshot":
-            # render what the pane shows now, at full quality, to a PNG for Claude
-            from PIL import Image
-
-            w, h = (int(v) for v in kw.get("size", "1280x800").split("x"))
-            self.cam.step()
-            if getattr(self.cam, "anim", None):
-                _, _, _, b = self.cam.anim
-                self.cam.yaw, self.cam.pitch, self.cam.dist, self.cam.target = b
-                self.cam.anim = None
-            img = self.compose(w, h, self.mode, True)
-            Image.fromarray(img).save(pos[0])
-            return {"ok": True, "path": pos[0], "camera": self.camera_info()}
         else:
             return {"error": f"unknown command {cmd!r}"}
         return {"ok": True, "camera": self.camera_info()}
+
+    def snapshot(self, pos, kw):
+        """A render of its own for Claude: a copy of the pane's view, or a view given here
+        (view=, frame=, from= / at=, mode=, size=). The pane's camera and look never change."""
+        from PIL import Image
+
+        if not pos:
+            return {"error": "snapshot needs a path: snapshot /tmp/x.png [view=top] [frame=NAME] [from=X,Y,Z] [at=X,Y,Z] [mode=solid] [size=WxH]"}
+        w, h = (int(v) for v in kw.get("size", "1280x800").split("x"))
+        vec = lambda t: [float(v) for v in t.replace(" ", "").split(",")]
+        cam = Camera()
+        anim = getattr(self.cam, "anim", None)
+        src = anim[3] if anim else (self.cam.yaw, self.cam.pitch, self.cam.dist, self.cam.target)
+        cam.yaw, cam.pitch, cam.dist, cam.target = src[0], src[1], src[2], np.array(src[3], dtype=np.float64)
+        own_view = False
+        if "view" in kw:
+            views = {"front": (0, 0), "back": (math.pi, 0), "right": (math.pi / 2, 0),
+                     "left": (-math.pi / 2, 0), "top": (0, math.pi / 2 - 1e-3), "bottom": (0, -math.pi / 2 + 1e-3)}
+            cam.yaw, cam.pitch = views[kw["view"]]
+            own_view = True
+        if "frame" in kw:
+            parts = self.find_parts(kw["frame"])
+            if not parts:
+                return {"error": f"no object matching {kw['frame']!r}"}
+            lo = self.from_file(np.min([p.lo for p in parts], axis=0))
+            hi = self.from_file(np.max([p.hi for p in parts], axis=0))
+            cam.target = (lo + hi) / 2
+            cam.dist = max(np.linalg.norm(hi - lo) / 2, 1e-3) * 1.2 / math.sin(FOV / 2)
+            own_view = True
+        if "at" in kw:
+            cam.target = self.from_blender(vec(kw["at"]))
+            own_view = True
+        if "from" in kw:
+            off = self.from_blender(vec(kw["from"])) - cam.target
+            cam.dist = float(np.linalg.norm(off))
+            cam.yaw = math.atan2(off[0], off[2])
+            cam.pitch = math.asin(max(-1.0, min(1.0, off[1] / max(cam.dist, 1e-9))))
+            own_view = True
+        mode = MODES.index(kw["mode"]) if "mode" in kw else self.mode
+        # render with the copied camera; the pane's own camera and footage view are put back untouched
+        saved_cam, saved_ref = self.cam, self.ref
+        self.cam = cam
+        if own_view:
+            self.ref = None  # a view of its own is never the footage camera
+        try:
+            img = self.compose(w, h, mode, True)
+        finally:
+            self.cam, self.ref = saved_cam, saved_ref
+            self.renderer.size = None  # the pane's next frame gets its own buffers back
+            self.dirty = True
+        Image.fromarray(img).save(pos[0])
+        return {"ok": True, "path": pos[0], "mode": MODES[mode],
+                "camera": {"eye": self.to_blender(cam.eye()), "target": self.to_blender(cam.target)}}
 
     def ref_command(self, pos, kw):
         sub = pos[0] if pos else "list"
@@ -1604,7 +1651,7 @@ class Viewer:
             plain += "  " + self.message
         left = "  ".join(bits)
         if self.ref is not None:
-            keys = "[ ] frame  { } shot  o overlay  r back  q quit"
+            keys = "← → frame  ↑ ↓ shot  o overlay  r back  q quit"
         elif self.refs:
             keys = "1 2 3 mode  space spin  z wire  v view  r footage  q quit"
         else:
