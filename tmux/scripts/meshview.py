@@ -1532,8 +1532,12 @@ class Viewer:
             self.renderer.size = None  # the pane's next frame gets its own buffers back
             self.dirty = True
         Image.fromarray(img).save(pos[0])
+        eye, target = self.to_blender(cam.eye()), self.to_blender(cam.target)
+        fmt = lambda v: ",".join(f"{x:g}" for x in v)
         return {"ok": True, "path": pos[0], "mode": MODES[mode],
-                "camera": {"eye": self.to_blender(cam.eye()), "target": self.to_blender(cam.target)}}
+                "camera": {"eye": eye, "target": target},
+                # to show Henri this same view afterwards: meshview ctl <show>
+                "show": f"look from={fmt(eye)} at={fmt(target)}"}
 
     def ref_command(self, pos, kw):
         sub = pos[0] if pos else "list"

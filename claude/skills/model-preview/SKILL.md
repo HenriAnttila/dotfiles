@@ -136,6 +136,21 @@ orbiting leaves it. A click in footage view picks through that camera. Only a
 model exported in the same frame as the cameras lines up; a part exported at
 the origin will look misplaced, so say that rather than calling it a mismatch.
 
+## Looking yourself, then showing the user
+
+When you need to see the model, render your own views; they never move the
+user's pane, so they don't depend on what the user is doing there:
+
+```sh
+meshview ctl snapshot /tmp/x.png [view=top] [frame=<name>] [from=X,Y,Z] [at=X,Y,Z] [mode=solid] [size=WxH]
+```
+
+Once you've looked and have something to say, show the user what it rests
+on, if a pane is open: run the `show` command from the snapshot's reply
+(`meshview ctl look from=… at=…`) so their camera glides to the view you
+judged from, mark the spot (`meshview ctl mark …`), and say in a line what you
+saw there.
+
 ## Checking a model yourself
 
 You cannot see the pane. To look at the model, render a snapshot and read the
