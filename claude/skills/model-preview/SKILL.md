@@ -89,6 +89,7 @@ meshview ctl look from=X,Y,Z at=X,Y,Z
 meshview ctl orbit 45 10           # degrees; zoom 2 = twice as close
 meshview ctl mark <name>|X,Y,Z     # gold ring where you mean; mark clear removes it
 meshview ctl mode render           # solid material render; wire/grid/spin [on|off]
+meshview ctl focus <name>|off      # show only matching objects (also in footage view), framed
 meshview ctl objects               # every object with tris and Blender-space bounds
 meshview ctl state                 # mode, camera, click, mark, stats
 meshview ctl snapshot /tmp/x.png   # exactly what the pane shows, to read yourself

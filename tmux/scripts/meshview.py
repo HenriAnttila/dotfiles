@@ -25,6 +25,7 @@ Keys (also shown in the pane's bottom line):
   1 2 3                     solid / material / render
   space                     spin on/off    z  wireframe   g  grid
   v                         front, right, top, back views      q  quit
+  click a part, then i      focus: its group (Door_...), i again: just it, i again: all
   r                         footage view on/off: it plays like a show; any key pauses,
                             space plays, ← → frame, ↑ ↓ shot, s real shot on/off, o overlay
 """
@@ -118,6 +119,7 @@ class Part:
         self.base, self.tex, self.metal, self.rough = base, tex, metal, rough
         self.name, self.lo, self.hi = name, lo, hi  # lo/hi: bounds in file (glTF) coordinates
         self.tris = len(faces)
+        self.hidden = False  # focus mode hides every part outside the focus
 
 
 def load_model(path):
@@ -521,6 +523,8 @@ class Renderer:
         c.disable(self.mgl.BLEND)
         self.set(self.pick_prog, "u_vp", gl(vp))
         for i, p in enumerate(self.parts):
+            if p.hidden:
+                continue
             self.set(self.pick_prog, "u_part", i + 1)
             p.pick_vao.render()
         ids = np.frombuffer(self.pick_fbo.read(components=2, dtype="u4"), dtype=np.uint32).reshape(h, w, 2)[::-1, :, 0]
@@ -567,6 +571,8 @@ class Renderer:
         c.disable(self.mgl.BLEND)
         self.set(self.pick_prog, "u_vp", gl(vp))
         for i, p in enumerate(self.parts):
+            if p.hidden:
+                continue
             self.set(self.pick_prog, "u_part", i + 1)
             p.pick_vao.render()
         gy = h - 1 - py
@@ -602,7 +608,8 @@ class Renderer:
             c.disable(mgl.BLEND)
             self.set(self.depth_prog, "u_light_vp", gl(light_vp))
             for p in self.parts:
-                p.depth_vao.render()
+                if not p.hidden:
+                    p.depth_vao.render()
 
         self.ms_fbo.use()
         c.viewport = (0, 0, w, h)
@@ -630,6 +637,8 @@ class Renderer:
             c.enable(mgl.BLEND)
             c.blend_func = mgl.ZERO, mgl.ONE
         for p in self.parts:
+            if p.hidden:
+                continue
             self.set(mp, "u_base", tuple(float(x) for x in p.base))
             self.set(mp, "u_metal", p.metal)
             self.set(mp, "u_rough", p.rough)
@@ -644,7 +653,8 @@ class Renderer:
             self.set(mp, "u_push", 0.0008)
             self.set(mp, "u_wire", (0.27, 0.88, 0.80, 1.0) if mode == 0 or layer == "wire" else (0.02, 0.06, 0.07, 1.0))
             for p in self.parts:
-                p.vao.render()
+                if not p.hidden:
+                    p.vao.render()
             c.wireframe = False
 
         if grid or use_shadow:
@@ -1243,6 +1253,8 @@ class Viewer:
                 self.spin = self.mode != 2
             elif k == " ":
                 self.spin = not self.spin
+            elif k == "i":
+                self.focus_key()
             elif k == "z":
                 self.wire = not self.wire
             elif k == "g":
@@ -1413,6 +1425,42 @@ class Viewer:
         canvas[oy:oy + rh, ox:ox + rw] = under * (1 - a) + rgb * a
         return (np.clip(canvas, 0, 1) * 255).astype(np.uint8)
 
+    # ─── focus: look at chosen parts only ───────────────────────────────────
+    def group_of(self, name):
+        """The parts sharing a name's first word: Door_surround -> every Door_... part."""
+        head = name.split("_")[0]
+        return [p for p in self.renderer.parts if p.name.split("_")[0] == head]
+
+    def set_focus(self, parts, label=""):
+        """Show only these parts (None: everything) and frame them."""
+        self.focus = parts
+        self.focus_label = label
+        for p in self.renderer.parts:
+            p.hidden = parts is not None and p not in parts
+        if parts and self.ref is None:
+            self.spin = False
+            self.frame_parts(parts)
+        self.message = f"focus: {label} ({len(parts)})" if parts else "showing everything"
+        self.interact()
+
+    def focus_key(self):
+        """i: the clicked part's group, then just that part, then everything again."""
+        picked = (self.click or {}).get("object")
+        level = getattr(self, "focus_level", 0)
+        if level == 0:
+            if not picked:
+                self.message = "click a part first, then i"
+                return
+            group = self.group_of(picked)
+            self.focus_level = 1
+            self.set_focus(group, picked.split("_")[0])
+        elif level == 1 and picked:
+            self.focus_level = 2
+            self.set_focus([p for p in self.renderer.parts if p.name == picked], picked)
+        else:
+            self.focus_level = 0
+            self.set_focus(None)
+
     # ─── coordinates: viewer space <-> file (glTF, Y up) <-> Blender (Z up) ───
     def to_file(self, p):
         center, radius = self.xform
@@ -1511,6 +1559,7 @@ class Viewer:
                 "wire|grid|spin [on|off]": "toggle (no argument flips it)",
                 "view front|back|left|right|top|bottom": "fly to a Blender-style view",
                 "frame [NAME]": "fly to fit objects whose name contains NAME (no NAME: whole model)",
+                "focus NAME | focus off": "show only objects whose name contains NAME (also in footage view), and frame them",
                 "orbit DYAW [DPITCH]": "orbit by degrees",
                 "zoom FACTOR": "2 = twice as close",
                 "look [from=X,Y,Z] [at=X,Y,Z]": "put the camera at / aim it at points",
@@ -1545,6 +1594,17 @@ class Viewer:
             return self.ref_command(pos, kw)
         if cmd == "snapshot":
             return self.snapshot(pos, kw)
+        if cmd == "focus":
+            if not pos or pos[0] in ("off", "all"):
+                self.focus_level = 0
+                self.set_focus(None)
+                return {"ok": True, "focus": None}
+            parts = self.find_parts(" ".join(pos))
+            if not parts:
+                return {"error": f"no object matching {' '.join(pos)!r}"}
+            self.focus_level = 1
+            self.set_focus(parts, " ".join(pos))
+            return {"ok": True, "focus": [p.name for p in parts]}
 
         # everything below changes the view
         self.interact()
@@ -1777,6 +1837,8 @@ class Viewer:
             r = self.ref_info()
             look = "real shot" if getattr(self, "ref_real", False) else r["style"]
             tail.append((f"{'▶' if getattr(self, 'ref_play', False) else '▣'} {r['shot']} {r['index']}/{r['frames']} {look}", TEAL))
+        if getattr(self, "focus", None):
+            tail.append((f"◎ {self.focus_label}", GOLD))
         if self.message:
             tail.append((self.message, GOLD))
         if self.ref is not None:
