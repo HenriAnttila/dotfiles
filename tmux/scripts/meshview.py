@@ -1055,29 +1055,22 @@ def fmt_bytes(n):
     return f"{n / 2**20:.1f} MB" if n >= 2**20 else f"{n / 2**10:.0f} KB"
 
 
-def stats_rows(st):
-    """Rows of (text, color) segments for the corner panel."""
+def fmt_count(n):
+    return f"{n / 1e6:.1f}M" if n >= 1e6 else f"{n / 1e3:.0f}k" if n >= 1e4 else f"{n:,}"
+
+
+def stats_rows(st, title=None, unit_m=1.0):
+    """The corner panel, kept short: triangles and pieces, then the size (in metres when the
+    file's unit is known, e.g. a project's studs)."""
     v, d = FG, DIM
-    sx, sy, sz = st["size"]
-    unit = f" {st['unit']}" if st["unit"] else ""
-    rows = [
-        [(f"{st['tris']:,}", v), (" tris  ", d), (f"{st['verts']:,}", v), (" verts", d)],
-        [(f"{st['objects']}", v), (" objects  ", d), (f"{st['materials']}", v), (" materials", d)],
-        [(f"{fmt_num(sx)} × {fmt_num(sy)} × {fmt_num(sz)}", v), (unit, d)],
-    ]
-    tex = st["textures"]
-    if tex:
-        counts = {}
-        for w, h in tex:
-            counts[f"{w}×{h}"] = counts.get(f"{w}×{h}", 0) + 1
-        rows.append([(f"{len(tex)}", v), (" textures  ", d), (fmt_bytes(st["texture_bytes"]), v)])
-        sizes = [(f"{n}× " if n > 1 else "", d) for n in counts.values()]
-        row = []
-        for (prefix, _), size in zip(sizes, counts):
-            row += [(prefix, d), (size, v), ("  ", d)]
-        rows.append(row[:-1])
-    else:
-        rows.append([("no textures", d)])
+    sx, sy, sz = (x * unit_m for x in st["size"])
+    unit = " m" if unit_m != 1.0 else (f" {st['unit']}" if st.get("unit") else "")
+    rows = []
+    if title:
+        rows.append([(title, GOLD)])
+    rows.append([(fmt_count(st["tris"]), v), (" tris  ", d), (f"{st['objects']}", v),
+                 (" objects" if st["objects"] != 1 else " object", d)])
+    rows.append([(f"{fmt_num(sx)} × {fmt_num(sy)} × {fmt_num(sz)}", v), (unit, d)])
     return rows
 
 
@@ -1441,7 +1434,16 @@ class Viewer:
             self.spin = False
             self.frame_parts(parts)
         self.message = f"focus: {label} ({len(parts)})" if parts else "showing everything"
+        self.panel_dirty = True
+        self.panel_clear = True  # the old panel may be wider: redraw the picture under it
         self.interact()
+
+    def focus_stats(self):
+        """The panel's numbers for the focused parts: triangles, pieces, size (file units)."""
+        parts = self.focus
+        lo = np.min([p.lo for p in parts], axis=0); hi = np.max([p.hi for p in parts], axis=0)
+        return {"tris": sum(p.tris for p in parts), "objects": len(parts),
+                "size": [float(x) for x in hi - lo], "unit": (self.stats or {}).get("unit", "")}
 
     def focus_key(self):
         """i: the clicked part's group, then just that part, then everything again."""
@@ -1948,11 +1950,18 @@ class Viewer:
                     t0 = time.time()
                     if self.renderer.parts:
                         img = self.compose(w, h, draw_mode, quality)
+                        if getattr(self, "panel_clear", False):
+                            screen.grid = None
+                            self.panel_clear = False
                         regrid = screen.grid != (cols, img_rows)
                         screen.show(img, cols, img_rows)
                         log("frame", w, h, "regrid", regrid, "panel", self.panel_dirty)
                         if (regrid or self.panel_dirty) and self.stats:
-                            screen.write(render_panel(stats_rows(self.stats), cols))
+                            if getattr(self, "focus", None):
+                                rows_ = stats_rows(self.focus_stats(), f"◎ {self.focus_label}", self.unit_m)
+                            else:
+                                rows_ = stats_rows(self.stats, None, self.unit_m)
+                            screen.write(render_panel(rows_, cols))
                             self.panel_dirty = False
                     fps = 0.8 * fps + 0.2 / max(time.time() - t0, 1e-3)
                     if want_refine:
