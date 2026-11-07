@@ -99,6 +99,10 @@ end
 vim.api.nvim_create_autocmd({ "UIEnter", "ColorScheme" }, {
   callback = function()
     make_transparent()
+    -- Again on the next tick: some schemes (heap) re-apply their highlights
+    -- in a vim.schedule after all ColorScheme handlers, which put the opaque
+    -- background back. Their callback is queued first, so this one runs last.
+    vim.schedule(make_transparent)
     -- Background is now transparent, so let the terminal's own bg show through.
     reset_bg()
     -- Sync the tmux status-bar accent to this colorscheme.
