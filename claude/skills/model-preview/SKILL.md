@@ -127,7 +127,7 @@ that frame:
 
 ```sh
 meshview ctl ref <shot> <frame>          # shot name or part of it, frame number
-meshview ctl ref style wire|ghost|model|footage  # wireframe over the frame / half-shaded / model only / the frame alone
+meshview ctl ref style outline|wire|ghost|model|footage  # model edges over the frame (default) / wireframe / half-shaded / model only / frame alone
 meshview ctl ref next | ref next shot | ref off
 ```
 

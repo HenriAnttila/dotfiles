@@ -505,6 +505,51 @@ class Renderer:
         proj = perspective(FOV, w / h, 0.02 * cam.dist, 40.0 + cam.dist * 4)
         return eye, view, proj @ view
 
+    def id_depth(self, w, h, override):
+        """Every pixel's part (0 = background) and its distance from the camera, top row first."""
+        c = self.ctx
+        if self.pick_size != (w, h):
+            self.pick_ids = c.texture((w, h), 2, dtype="u4")
+            self.pick_depth = c.depth_texture((w, h))
+            self.pick_fbo = c.framebuffer(color_attachments=[self.pick_ids], depth_attachment=self.pick_depth)
+            self.pick_size = (w, h)
+        _, view, vp = override
+        self.pick_fbo.use()
+        c.viewport = (0, 0, w, h)
+        self.pick_fbo.clear(0, 0, 0, 0, depth=1.0)
+        c.enable(self.mgl.DEPTH_TEST)
+        c.disable(self.mgl.BLEND)
+        self.set(self.pick_prog, "u_vp", gl(vp))
+        for i, p in enumerate(self.parts):
+            self.set(self.pick_prog, "u_part", i + 1)
+            p.pick_vao.render()
+        ids = np.frombuffer(self.pick_fbo.read(components=2, dtype="u4"), dtype=np.uint32).reshape(h, w, 2)[::-1, :, 0]
+        z = np.frombuffer(self.pick_fbo.read(components=1, attachment=-1, dtype="f4"), dtype=np.float32).reshape(h, w)[::-1]
+        # depth buffer -> distance along the view: invert the projection's z (P[2,2], P[2,3])
+        proj = vp @ np.linalg.inv(view)
+        a, b = proj[2, 2], proj[2, 3]
+        ndc = z * 2.0 - 1.0
+        # z_clip = a*z + b, w_clip = -z  ->  ndc = -(a*z + b)/z  ->  distance -z = b / (ndc + a)
+        den = ndc + a
+        dist = np.abs(b / np.where(np.abs(den) < 1e-9, -1e-9, den))
+        return ids, np.where(ids > 0, dist, np.inf)
+
+    def outlines(self, w, h, override):
+        """Thin lines where the picture changes for real: the silhouette, where one part meets
+        another, and where a surface folds away (a jump in distance). RGBA, top row first."""
+        ids, dist = self.id_depth(w, h, override)
+        edge = np.zeros((h, w), dtype=bool)
+        for dy, dx in ((0, 1), (1, 0)):
+            a_ids, b_ids = ids[: h - dy, : w - dx], ids[dy:, dx:]
+            a_d, b_d = dist[: h - dy, : w - dx], dist[dy:, dx:]
+            near = np.minimum(a_d, b_d)
+            jump = np.abs(np.where(np.isfinite(a_d) & np.isfinite(b_d), a_d - b_d, 0)) > 0.04 * np.where(np.isfinite(near), near, 1)
+            e = (a_ids != b_ids) | jump
+            edge[: h - dy, : w - dx] |= e
+        out = np.zeros((h, w, 4), dtype=np.uint8)
+        out[edge] = (70, 245, 220, 255)
+        return out
+
     def pick(self, cam, w, h, px, py, override=None):
         """What is under pixel (px, py), top-left origin: (part index, triangle, point) or None."""
         c = self.ctx
@@ -1071,7 +1116,7 @@ class Viewer:
         self.refs = shots_in(side["refs"]) if side.get("refs") else find_refs(model)
         self.ref_shots = {}
         self.ref = None  # (shot index, frame index) while showing the model through a show camera
-        self.ref_style = "wire"
+        self.ref_style = "outline"
         self.foot_cache = None
         # metres per file unit, for the footage cameras. A .glb in a project with placed shots
         # (found by walking up to observations/place) is that project's Roblox export: studs.
@@ -1289,7 +1334,7 @@ class Viewer:
         elif k in "{}":
             self.enter_ref((self.ref[0] + (1 if k == "}" else -1)) % len(self.refs), frame=0)
         elif k == "o":
-            styles = ["wire", "ghost", "model", "footage"]
+            styles = ["outline", "wire", "ghost", "model", "footage"]
             self.ref_style = styles[(styles.index(self.ref_style) + 1) % len(styles)]
         self.interact()
         return True
@@ -1333,10 +1378,15 @@ class Viewer:
         if self.ref is None:
             return self.renderer.render(self.cam, draw_mode, W, H, self.wire, self.grid, quality, self.markers())
         rw, rh, ox, oy, ov = self.ref_view(W, H)
-        if self.ref_style == "footage":  # the real frame alone, nothing drawn on it
+        if self.ref_style in ("footage", "outline"):  # the real frame, alone or with the model's edges
             canvas = np.empty((H, W, 3), dtype=np.float32)
             canvas[:] = BG_BOTTOM
-            canvas[oy:oy + rh, ox:ox + rw] = self.footage(rw, rh)
+            frame = self.footage(rw, rh)
+            if self.ref_style == "outline":
+                lines = self.renderer.outlines(rw, rh, ov).astype(np.float32) / 255
+                a = lines[..., 3:4]
+                frame = frame * (1 - a) + lines[..., :3] * a
+            canvas[oy:oy + rh, ox:ox + rw] = frame
             return (np.clip(canvas, 0, 1) * 255).astype(np.uint8)
         layer = self.renderer.render(self.cam, draw_mode, rw, rh, self.wire, False, True, self.markers(),
                                      override=ov, layer="wire" if self.ref_style == "wire" else "shaded")
@@ -1457,7 +1507,7 @@ class Viewer:
                 "mark X,Y,Z | mark NAME | mark clear": "gold ring at a point or an object's centre",
                 "snapshot PATH [view=…] [frame=NAME] [from=X,Y,Z] [at=X,Y,Z] [mode=…] [size=WxH]": "a render of its own to a PNG; the pane's view never changes",
                 "ref list | ref SHOT [FRAME] | ref next|prev [shot] | ref off": "the model through a solved show camera, over that frame",
-                "ref style wire|ghost|model|footage | ref unit METRES_PER_UNIT | ref dir PATH": "overlay look (footage: the frame alone); file units; where the placed shots are",
+                "ref style outline|wire|ghost|model|footage | ref unit METRES_PER_UNIT | ref dir PATH": "overlay look (outline: the model's edges only; footage: the frame alone); file units; where the placed shots are",
             }, "coords": "Blender (Z up), file units"}
         if cmd == "state":
             return {
