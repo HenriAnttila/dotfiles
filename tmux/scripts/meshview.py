@@ -26,7 +26,7 @@ Keys (also shown in the pane's bottom line):
   space                     spin on/off    z  wireframe   g  grid
   v                         front, right, top, back views      q  quit
   r                         footage view on/off: it plays like a show; any key pauses,
-                            space plays, ← → frame, ↑ ↓ shot, o overlay
+                            space plays, ← → frame, ↑ ↓ shot, s real shot on/off, o overlay
 """
 
 import math
@@ -852,7 +852,9 @@ class Screen:
         self.files = keep
 
     def status(self, row, cols, text):
-        self.write(f"\x1b[{row};1H\x1b[2K{text}\x1b[0m")
+        # autowrap off while writing: a row one column too wide would otherwise wrap,
+        # scroll the whole pane up a line and lose the row
+        self.write(f"\x1b[?7l\x1b[{row};1H\x1b[2K{text}\x1b[0m\x1b[?7h")
 
     def cleanup(self):
         self.write(self.wrap(f"\x1b_Ga=d,d=I,i={IMAGE_ID},q=2\x1b\\"))
@@ -1211,6 +1213,10 @@ class Viewer:
                 if k in step:
                     self.ref_play = False
                     return self.ref_key(step[k])
+            if self.ref is not None and k == "s":  # the real shot alone, and back
+                self.ref_real = not getattr(self, "ref_real", False)
+                self.interact()
+                return True
             if k in ("r", "[", "]", "{", "}", "o"):
                 return self.ref_key(k)
             if self.ref is not None and k in ("h", "j", "k", "l", "H", "J", "K", "L", "left", "right", "up",
@@ -1334,7 +1340,9 @@ class Viewer:
         elif k in "{}":
             self.enter_ref((self.ref[0] + (1 if k == "}" else -1)) % len(self.refs), frame=0)
         elif k == "o":
-            styles = ["outline", "wire", "ghost", "model", "footage"]
+            styles = ["outline", "wire", "ghost", "model"]
+            if self.ref_style not in styles:
+                self.ref_style = "footage"  # so the next press starts the cycle again
             self.ref_style = styles[(styles.index(self.ref_style) + 1) % len(styles)]
         self.interact()
         return True
@@ -1378,11 +1386,12 @@ class Viewer:
         if self.ref is None:
             return self.renderer.render(self.cam, draw_mode, W, H, self.wire, self.grid, quality, self.markers())
         rw, rh, ox, oy, ov = self.ref_view(W, H)
-        if self.ref_style in ("footage", "outline"):  # the real frame, alone or with the model's edges
+        real = getattr(self, "ref_real", False) or self.ref_style == "footage"
+        if real or self.ref_style == "outline":  # the real frame, alone or with the model's edges
             canvas = np.empty((H, W, 3), dtype=np.float32)
             canvas[:] = BG_BOTTOM
             frame = self.footage(rw, rh)
-            if self.ref_style == "outline":
+            if not real:
                 lines = self.renderer.outlines(rw, rh, ov).astype(np.float32) / 255
                 a = lines[..., 3:4]
                 frame = frame * (1 - a) + lines[..., :3] * a
@@ -1765,12 +1774,13 @@ class Viewer:
         tail = []
         if self.ref is not None:
             r = self.ref_info()
-            tail.append((f"{'▶' if getattr(self, 'ref_play', False) else '▣'} {r['shot']} {r['index']}/{r['frames']} {r['style']}", TEAL))
+            look = "real shot" if getattr(self, "ref_real", False) else r["style"]
+            tail.append((f"{'▶' if getattr(self, 'ref_play', False) else '▣'} {r['shot']} {r['index']}/{r['frames']} {look}", TEAL))
         if self.message:
             tail.append((self.message, GOLD))
         if self.ref is not None:
-            keys = ["space play/pause  ← → frame  ↑ ↓ shot  o overlay  r back  q quit",
-                    "␣ play  ←→ frame  ↑↓ shot  o look  r back  q"]
+            keys = ["s real shot  o overlay  space play  ← → frame  ↑ ↓ shot  r back  q quit",
+                    "s real  o look  ␣ play  ←→ frame  ↑↓ shot  r back  q"]
         elif self.refs:
             keys = ["1 2 3 mode  space spin  z wire  v view  r footage  q quit",
                     "123 mode  ␣ spin  z wire  v view  r footage  q"]
@@ -1781,18 +1791,23 @@ class Viewer:
         def plain(parts):
             return "  ".join(t for t, _ in parts)
 
+        def width(text):
+            import unicodedata
+            return sum(2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1 for ch in text)
+
         def styled(parts):
             return "  ".join(f"\x1b[38;2;{c}m{t}\x1b[22m" for t, c in parts)
 
+        cols -= 2  # a margin: some terminals draw arrows and symbols wider than they report
         for parts in (head + name + tail, head + tail, tail or head):
             for k in keys:
-                if len(plain(parts)) + len(k) + 3 <= cols:
-                    gap = cols - len(plain(parts)) - len(k) - 1
+                if width(plain(parts)) + width(k) + 3 <= cols:
+                    gap = cols - width(plain(parts)) - width(k) - 1
                     return styled(parts) + " " * gap + f"\x1b[38;2;{DIM}m{k}"
         k = keys[-1]
-        room = max(0, cols - len(k) - 3)
+        room = max(0, cols - width(k) - 3)
         left = plain(tail or head)[:room]
-        return f"\x1b[38;2;{TEAL}m{left}" + " " * max(1, cols - len(left) - len(k) - 1) + f"\x1b[38;2;{DIM}m{k}"
+        return f"\x1b[38;2;{TEAL}m{left}" + " " * max(1, cols - width(left) - width(k) - 1) + f"\x1b[38;2;{DIM}m{k}"
 
     def run(self):
         out = sys.stdout

@@ -131,7 +131,7 @@ meshview ctl ref style outline|wire|ghost|model|footage  # model edges over the 
 meshview ctl ref next | ref next shot | ref off
 ```
 
-The user's keys: r footage on/off, ← → frame, ↑ ↓ shot, o overlay style;
+The user's keys: r footage on/off, ← → frame, ↑ ↓ shot, s real shot on/off, o overlay style;
 orbiting leaves it. A click in footage view picks through that camera. Only a
 model exported in the same frame as the cameras lines up; a part exported at
 the origin will look misplaced, so say that rather than calling it a mismatch.
