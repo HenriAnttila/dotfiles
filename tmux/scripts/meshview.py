@@ -2004,7 +2004,8 @@ def log(*a):
 
 
 def find_socket(pane=None):
-    """The control socket of a meshview pane: the given one, else this window's, else any."""
+    """The control socket of a meshview pane: the given one, else this window's, else this
+    session's (it opens in its own window when the conversation's window is full), else any."""
     if os.environ.get("MESHVIEW_SOCK"):
         return os.environ["MESHVIEW_SOCK"]
 
@@ -2017,9 +2018,10 @@ def find_socket(pane=None):
         r = subprocess.run(["tmux", "show", "-pqv", "-t", pane, "@meshview_sock"], capture_output=True, text=True)
         return r.stdout.strip() or None
     if os.environ.get("TMUX_PANE"):
-        here = panes("-t", os.environ["TMUX_PANE"])
-        if here:
-            return here[0]
+        for scope in (("-t", os.environ["TMUX_PANE"]), ("-s", "-t", os.environ["TMUX_PANE"])):
+            here = panes(*scope)
+            if here:
+                return here[0]
     found = panes("-a")
     return found[0] if found else None
 

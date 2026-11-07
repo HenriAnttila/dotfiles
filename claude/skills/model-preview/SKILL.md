@@ -16,9 +16,11 @@ the pane shows a file, re-exporting that file updates the pane. The viewer is
 ~/.claude/skills/model-preview/scripts/show.sh <model file>
 ```
 
-It reuses the meshview pane already in this tmux window (switching it to this
-file if it showed another) or opens one as a split to the right, and leaves the
-keyboard on this conversation. It prints the pane id. Files: .glb, .gltf, .obj,
+It reuses the meshview pane already open in this tmux session (switching it to
+this file if it showed another) or opens one: a split to the right while this
+window has only the conversation, its own window (tab) once it has two panes, so
+it never ends up a narrow third column. It leaves the keyboard on this
+conversation; when it opened a new window, tell the user it's in the next tab. It prints the pane id. Files: .glb, .gltf, .obj,
 .stl, .ply, and .blend (exported to .glb with headless Blender on every save,
 which takes a few seconds).
 
@@ -78,7 +80,7 @@ click the spot.
 
 ## Driving the pane
 
-`meshview ctl <command>` talks to the meshview pane in this tmux window and
+`meshview ctl <command>` talks to the meshview pane in this tmux window (else this session) and
 prints JSON. Show, don't describe: when you explain a part, fly the camera to
 it and mark it.
 

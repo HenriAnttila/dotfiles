@@ -2,7 +2,8 @@
 # meshview-open.sh PANE — the "meshview" entry of the Alt+Shift+i split menu.
 #
 # Opens a popup listing the 3D models under PANE's directory (fd + fzf, type to
-# filter); the one picked opens in meshview in a split to the right of PANE.
+# filter); the one picked opens in meshview beside PANE: a split, or a new
+# window if PANE's window already has two panes (open-beside.sh).
 # The split is tagged @meshview like the model-preview skill's, so Claude reuses
 # it. The picking runs inside the popup (--pick), so nothing has to wait on it.
 set -eu
@@ -14,7 +15,7 @@ if [ "${1:-}" = "--pick" ]; then
     | fzf --prompt='model> ' --height=100% --reverse || true)"
   [ -n "$model" ] || exit 0
   model="$dir/$model"
-  new="$(tmux split-window -h -t "$pane" -c "$dir" -P -F '#{pane_id}' -- "$HOME/.local/bin/meshview" "$model")"
+  new="$("$HOME/.tmux/scripts/open-beside.sh" -n meshview -c "$dir" "$pane" -- "$HOME/.local/bin/meshview" "$model")"
   tmux set -p -t "$new" @meshview "$model"
   exit 0
 fi
