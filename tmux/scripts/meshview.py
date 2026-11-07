@@ -859,8 +859,9 @@ def parse_input(buf):
 # solve of the footage (solve/radial/*.bin, frames in solve/images/) and a
 # placement.json putting the build frame (Blender: metres, Z up) into the solve
 # frame: X_solve = e^logscale * R(rotvec) * Rz(turn_deg) * X_build + shift
-# (Coral tools/shot3d.py to_solve). The model must be in the cameras' unit,
-# metres, unless `ref unit` says otherwise.
+# (Coral tools/shot3d.py to_solve). The cameras are in metres; a project's .glb
+# exports are in Roblox studs (build_room.py: 1 stud = 0.28 m).
+STUD_M = 0.28
 
 
 def find_refs(model):
@@ -1072,8 +1073,11 @@ class Viewer:
         self.ref = None  # (shot index, frame index) while showing the model through a show camera
         self.ref_style = "wire"
         self.foot_cache = None
-        # metres per file unit, for the footage cameras
-        self.unit_m = float(os.environ.get("MESHVIEW_UNIT_M", side.get("unit_m", 1.0)))
+        # metres per file unit, for the footage cameras. A .glb in a project with placed shots
+        # (found by walking up to observations/place) is that project's Roblox export: studs.
+        in_project = bool(self.refs) and not side.get("refs") and not os.environ.get("MESHVIEW_REFS")
+        default_unit = STUD_M if in_project and Path(model).suffix.lower() == ".glb" else 1.0
+        self.unit_m = float(os.environ.get("MESHVIEW_UNIT_M", side.get("unit_m", default_unit)))
         self.glb = self.model
         if self.model.suffix.lower() == ".blend":
             cache = Path(tempfile.gettempdir()) / "meshview"
