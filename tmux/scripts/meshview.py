@@ -1706,31 +1706,43 @@ class Viewer:
         self.visible = vis
 
     def status_line(self, cols, fps):
+        """The bottom row: what is shown on the left, the keys on the right. The keys never
+        disappear: when the row is short they go compact first, then the file name goes,
+        and only then is the left part cut."""
         mode = MODES[self.mode]
-        bits = [
-            f"\x1b[38;2;{TEAL};1m ◆ {mode}\x1b[22m",
-            f"\x1b[38;2;{GOLD}m{'⟳ ' if self.spin else ''}\x1b[38;2;{FG}m{self.model.name}",
-        ]
-        plain = f" ◆ {mode}  {'⟳ ' if self.spin else ''}{self.model.name}"
+        head = [(f" ◆ {mode}", f"{TEAL};1")]
+        name = [(("⟳ " if self.spin else "") + self.model.name, FG)]
+        tail = []
         if self.ref is not None:
             r = self.ref_info()
-            ref = f"{'▶' if getattr(self, 'ref_play', False) else '▣'} {r['shot']} {r['index']}/{r['frames']} {r['style']}"
-            bits.append(f"\x1b[38;2;{TEAL}m{ref}")
-            plain += "  " + ref
+            tail.append((f"{'▶' if getattr(self, 'ref_play', False) else '▣'} {r['shot']} {r['index']}/{r['frames']} {r['style']}", TEAL))
         if self.message:
-            bits.append(f"\x1b[38;2;{GOLD}m{self.message}")
-            plain += "  " + self.message
-        left = "  ".join(bits)
+            tail.append((self.message, GOLD))
         if self.ref is not None:
-            keys = "space play/pause  ← → frame  ↑ ↓ shot  o overlay  r back  q quit"
+            keys = ["space play/pause  ← → frame  ↑ ↓ shot  o overlay  r back  q quit",
+                    "␣ play  ←→ frame  ↑↓ shot  o look  r back  q"]
         elif self.refs:
-            keys = "1 2 3 mode  space spin  z wire  v view  r footage  q quit"
+            keys = ["1 2 3 mode  space spin  z wire  v view  r footage  q quit",
+                    "123 mode  ␣ spin  z wire  v view  r footage  q"]
         else:
-            keys = "1 2 3 mode  space spin  z wire  g grid  v view  f frame  q quit"
-        visible_len = len(plain)
-        if visible_len + len(keys) + 4 <= cols:
-            left += " " * (cols - visible_len - len(keys) - 1) + f"\x1b[38;2;{DIM}m{keys}"
-        return left
+            keys = ["1 2 3 mode  space spin  z wire  g grid  v view  f frame  q quit",
+                    "123 mode  ␣ spin  z wire  g grid  v view  q"]
+
+        def plain(parts):
+            return "  ".join(t for t, _ in parts)
+
+        def styled(parts):
+            return "  ".join(f"\x1b[38;2;{c}m{t}\x1b[22m" for t, c in parts)
+
+        for parts in (head + name + tail, head + tail, tail or head):
+            for k in keys:
+                if len(plain(parts)) + len(k) + 3 <= cols:
+                    gap = cols - len(plain(parts)) - len(k) - 1
+                    return styled(parts) + " " * gap + f"\x1b[38;2;{DIM}m{k}"
+        k = keys[-1]
+        room = max(0, cols - len(k) - 3)
+        left = plain(tail or head)[:room]
+        return f"\x1b[38;2;{TEAL}m{left}" + " " * max(1, cols - len(left) - len(k) - 1) + f"\x1b[38;2;{DIM}m{k}"
 
     def run(self):
         out = sys.stdout
