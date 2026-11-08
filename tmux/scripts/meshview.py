@@ -6,7 +6,7 @@
 """meshview: a 3D model preview that lives in a tmux pane.
 
     meshview MODEL            view MODEL in this pane
-    meshview --split MODEL    open a tmux split beside this pane and view it there
+    meshview --split MODEL    open it beside this pane: a split, or a new window if this one has two panes
     meshview --stats MODEL    print the model's statistics as JSON
     meshview ctl COMMAND ...  drive the meshview pane in this tmux window (see `ctl help`)
     meshview --snapshot OUT.png [--mode solid|material|render] MODEL
@@ -1094,7 +1094,7 @@ class Viewer:
         self.model = Path(model).resolve()
         self.renderer = Renderer()
         self.cam = Camera()
-        self.mode = 1
+        self.mode = 0  # opens in solid; 2 and 3 switch to material and render
         self.spin = True
         self.wire = False
         self.grid = True
@@ -1115,6 +1115,9 @@ class Viewer:
         self.click = None  # last thing the user clicked, for Claude
         self.click_mark = None  # viewer-space point under the teal ring
         self.claude_mark = None  # viewer-space point under the gold ring
+        self.pin_mode = 0  # footage view pins: 0 off, 1 waiting for a model spot, 2 waiting for where it is in the frame
+        self.pin_pending = None  # the model spot of a pin not yet placed in the frame
+        self.pins = {}  # shot name -> pins (model point and where the user says it is in a frame), saved to pins.json
         # <model>.meshview.json (written by model-preview's preview_build.sh): the source
         # .blend's placed shots and the file's unit, for a preview outside the project
         side = Path(str(self.model) + ".meshview.json")
@@ -1217,6 +1220,19 @@ class Viewer:
                 if k in step:
                     self.ref_play = False
                     return self.ref_key(step[k])
+            if self.ref is not None and k == "p":  # pins: a model spot, then where it really is in the frame
+                self.pin_mode = 0 if self.pin_mode else 1
+                self.pin_pending = None
+                self.ref_play = False
+                self.message = "pin: click a spot on the model" if self.pin_mode else "pins off"
+                self.interact()
+                return True
+            if self.ref is not None and k == "u" and self.shot_pins():  # undo the last pin
+                gone = self.shot_pins().pop()
+                self.save_pins()
+                self.message = f"removed the pin on {gone['object']}"
+                self.interact()
+                return True
             if self.ref is not None and k == "s":  # the real shot alone, and back
                 self.ref_real = not getattr(self, "ref_real", False)
                 self.interact()
@@ -1286,7 +1302,10 @@ class Viewer:
                 self.interact()
             elif not pressed:
                 if self.drag and self.drag[0] == 0 and not getattr(self, "dragged", True):
-                    self.pick_at(x, y)
+                    if self.ref is not None and self.pin_mode:
+                        self.pin_click(x, y)
+                    else:
+                        self.pick_at(x, y)
                 self.drag = None
         return True
 
@@ -1539,6 +1558,112 @@ class Viewer:
             self.message = f"picked {part.name}"
         self.interact()
 
+    # ─── pins: a model spot, and where it really is in a footage frame ─────
+    def shot_pins(self):
+        """The current shot's pins (loaded from its pins.json the first time)."""
+        if self.ref is None:
+            return []
+        shot = self.ref_shot()
+        if shot.name not in self.pins:
+            f = shot.path / "pins.json"
+            self.pins[shot.name] = json.loads(f.read_text())["pins"] if f.exists() else []
+        return self.pins[shot.name]
+
+    def save_pins(self):
+        shot = self.ref_shot()
+        note = ("Henri's pins in meshview: a spot on the model (point: Blender coordinates, metres = point x unit_m) and "
+                "where it really is in the frame (pixel: the original frame; pixel_straight: undistorted, same f, cx, cy)")
+        (shot.path / "pins.json").write_text(json.dumps({"_": note, "pins": self.shot_pins()}, indent=1))
+
+    def frame_xy(self, x, y):
+        """A click at cell (x, y): the footage view's geometry and the click's pixel in it, or None off the frame."""
+        if not self.layout:
+            return None
+        cols, img_rows, cw, ch = self.layout
+        if y > img_rows:
+            return None
+        w, h = max(16, int(cols * cw)), max(16, int(img_rows * ch))
+        px, py = min(w - 1, int((x - 0.5) * cw)), min(h - 1, int((y - 0.5) * ch))
+        rw, rh, ox, oy, ov = self.ref_view(w, h)
+        px, py = px - ox, py - oy
+        if not (0 <= px < rw and 0 <= py < rh):
+            return None
+        return rw, rh, px, py, ov
+
+    def pin_click(self, x, y):
+        got = self.frame_xy(x, y)
+        if got is None:
+            return
+        rw, rh, px, py, ov = got
+        shot = self.ref_shot()
+        if self.pin_mode == 1:  # the model spot
+            hit = self.renderer.pick(self.cam, rw, rh, px, py, override=ov)
+            if hit is None:
+                self.message = "no model there: click a spot on the model"
+            else:
+                i, tri, p = hit
+                self.pin_pending = {"object": self.renderer.parts[i].name, "point": self.to_blender(p), "unit_m": self.unit_m, "_view": p}
+                self.click_mark = p
+                self.pin_mode = 2
+                self.message = f"{self.pin_pending['object']}: now click where that spot really is in the frame"
+        else:  # where it is in the frame: a pixel of the straightened frame, and of the original
+            sw, sh = shot.size
+            K = shot.K
+            u, v = (px + 0.5) * sw / rw - 0.5, (py + 0.5) * sh / rh - 0.5
+            xn, yn = (u - K["cx"]) / K["f"], (v - K["cy"]) / K["f"]
+            r2 = xn * xn + yn * yn
+            d = 1 + K["k1"] * r2 + K["k2"] * r2 * r2
+            pin = {k: v_ for k, v_ in self.pin_pending.items() if k != "_view"}
+            pin.update(frame=shot.frames[self.ref[1]][0], pixel_straight=[round(u, 1), round(v, 1)],
+                       pixel=[round(K["cx"] + K["f"] * xn * d, 1), round(K["cy"] + K["f"] * yn * d, 1)], time=time.time())
+            self.shot_pins().append(pin)
+            self.save_pins()
+            self.pin_pending, self.click_mark, self.pin_mode = None, None, 1
+            self.message = f"pin {len(self.shot_pins())} saved: click the next model spot (u undo, p done)"
+        self.interact()
+
+    def draw_pins(self, img, W, H):
+        """Each pin of this frame: a line from where the model spot is drawn to where the user put it."""
+        if self.ref is None or not (self.shot_pins() or self.pin_pending):
+            return img
+        rw, rh, ox, oy, (eye, view, mvp) = self.ref_view(W, H)
+        shot = self.ref_shot()
+        sw, sh = shot.size
+        fname = shot.frames[self.ref[1]][0]
+
+        def to_screen(p_view):
+            c = mvp @ np.r_[np.asarray(p_view, dtype=np.float64), 1.0]
+            if c[3] <= 0:
+                return None
+            return ox + (c[0] / c[3] + 1) / 2 * rw, oy + (1 - c[1] / c[3]) / 2 * rh
+
+        def dot(x, y, col, r=3):
+            x, y = int(round(x)), int(round(y))
+            img[max(0, y - r):min(H, y + r + 1), max(0, x - r):min(W, x + r + 1)] = col
+
+        def line(a, b, col):
+            n = int(max(abs(b[0] - a[0]), abs(b[1] - a[1]))) + 1
+            for t in np.linspace(0, 1, n):
+                x, y = int(round(a[0] + (b[0] - a[0]) * t)), int(round(a[1] + (b[1] - a[1]) * t))
+                if 0 <= x < W and 0 <= y < H:
+                    img[y, x] = col
+
+        gold, teal = (242, 191, 89), (69, 224, 204)
+        for pin in self.shot_pins():
+            if pin["frame"] != fname:
+                continue
+            a = to_screen(self.from_blender(pin["point"]))
+            b = (ox + (pin["pixel_straight"][0] + 0.5) * rw / sw - 0.5, oy + (pin["pixel_straight"][1] + 0.5) * rh / sh - 0.5)
+            if a:
+                line(a, b, gold)
+                dot(*a, teal, 2)
+            dot(*b, gold)
+        if self.pin_pending:
+            a = to_screen(self.pin_pending["_view"])
+            if a:
+                dot(*a, teal, 4)
+        return img
+
     # ─── commands from Claude (meshview ctl) ────────────────────────────────
     def find_parts(self, name):
         name = name.lower()
@@ -1599,6 +1724,14 @@ class Viewer:
             return {"click": self.click}
         if cmd == "ref":
             return self.ref_command(pos, kw)
+        if cmd == "pins":  # the current shot's pins; pins clear / pins undo
+            if self.ref is None:
+                return {"error": "not in footage view: ref <shot> <frame> first"}
+            if pos[:1] == ["clear"]:
+                self.shot_pins().clear(); self.save_pins(); self.interact()
+            elif pos[:1] == ["undo"] and self.shot_pins():
+                self.shot_pins().pop(); self.save_pins(); self.interact()
+            return {"shot": self.ref_shot().name, "file": str(self.ref_shot().path / "pins.json"), "pins": self.shot_pins(), "pin_mode": self.pin_mode}
         if cmd == "snapshot":
             return self.snapshot(pos, kw)
         if cmd == "focus":
@@ -1606,7 +1739,9 @@ class Viewer:
                 self.focus_level = 0
                 self.set_focus(None)
                 return {"ok": True, "focus": None}
-            parts = self.find_parts(" ".join(pos))
+            parts = []
+            for name in " ".join(pos).split(","):  # several names: focus Console,Pillar,Door
+                parts += [p for p in self.find_parts(name.strip()) if p not in parts]
             if not parts:
                 return {"error": f"no object matching {' '.join(pos)!r}"}
             self.focus_level = 1
@@ -1849,8 +1984,9 @@ class Viewer:
         if self.message:
             tail.append((self.message, GOLD))
         if self.ref is not None:
-            keys = ["s real shot  o overlay  space play  ← → frame  ↑ ↓ shot  r back  q quit",
-                    "s real  o look  ␣ play  ←→ frame  ↑↓ shot  r back  q"]
+            keys = (["click model, then frame  u undo  p done  ← → frame", "click model, then frame  u undo  p done"] if self.pin_mode else
+                    ["p pins  s real shot  o overlay  space play  ← → frame  ↑ ↓ shot  r back  q quit",
+                     "p pins  s real  o look  ␣ play  ←→ frame  ↑↓ shot  r back  q"])
         elif self.refs:
             keys = ["1 2 3 mode  space spin  z wire  v view  r footage  q quit",
                     "123 mode  ␣ spin  z wire  v view  r footage  q"]
@@ -1954,7 +2090,7 @@ class Viewer:
                     draw_mode = self.mode if (self.mode != 2 or quality) else 1
                     t0 = time.time()
                     if self.renderer.parts:
-                        img = self.compose(w, h, draw_mode, quality)
+                        img = self.draw_pins(self.compose(w, h, draw_mode, quality), w, h)
                         if getattr(self, "panel_clear", False):
                             screen.grid = None
                             self.panel_clear = False
@@ -2066,7 +2202,9 @@ def main():
             print("meshview --split needs tmux", file=sys.stderr)
             return 1
         me = shutil.which("meshview") or str(Path(__file__).resolve())
-        subprocess.run(["tmux", "split-window", "-h", "-c", str(model.parent), me, str(model)])
+        # a split while this window has one pane, a new window once it has two (never a narrow third column)
+        subprocess.run([str(Path.home() / ".tmux/scripts/open-beside.sh"), "-n", "meshview", "-c", str(model.parent),
+                        os.environ.get("TMUX_PANE", ""), "--", me, str(model)], stdout=subprocess.DEVNULL)
         return 0
     if args[0] == "ctl":
         return ctl(args[1:])
