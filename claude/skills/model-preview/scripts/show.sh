@@ -4,7 +4,8 @@
 # Reuses the meshview pane already open in this tmux session (tagged with the
 # pane option @meshview), switching it to MODEL if it shows something else;
 # otherwise opens one beside this pane without taking the keyboard: a split
-# while this window has one pane, a new window once it has two (open-beside.sh).
+# while this row has one or two panes side by side, a new window once it has
+# three (open-beside.sh).
 # meshview watches the file, so re-exporting MODEL updates the pane by itself.
 # Prints the pane id.
 set -eu

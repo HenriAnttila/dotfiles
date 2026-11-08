@@ -3,7 +3,7 @@
 #
 # Opens a popup listing the 3D models under PANE's directory (fd + fzf, type to
 # filter); the one picked opens in meshview beside PANE: a split, or a new
-# window if PANE's window already has two panes (open-beside.sh).
+# window if PANE's row already has three panes side by side (open-beside.sh).
 # The split is tagged @meshview like the model-preview skill's, so Claude reuses
 # it. The picking runs inside the popup (--pick), so nothing has to wait on it.
 set -eu

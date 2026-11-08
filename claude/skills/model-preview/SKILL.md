@@ -18,8 +18,8 @@ the pane shows a file, re-exporting that file updates the pane. The viewer is
 
 It reuses the meshview pane already open in this tmux session (switching it to
 this file if it showed another) or opens one: a split to the right while this
-window has only the conversation, its own window (tab) once it has two panes, so
-it never ends up a narrow third column. It leaves the keyboard on this
+row has one or two panes side by side, its own window (tab) once it has three, so
+it never ends up a narrow fourth column. It leaves the keyboard on this
 conversation; when it opened a new window, tell the user it's in the next tab. It prints the pane id. Files: .glb, .gltf, .obj,
 .stl, .ply, and .blend (exported to .glb with headless Blender on every save,
 which takes a few seconds).

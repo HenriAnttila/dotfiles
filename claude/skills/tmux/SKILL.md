@@ -1,6 +1,6 @@
 ---
 name: tmux
-description: Open things in the user's tmux from this session, as a popup over the conversation or beside it (a split, or a new window when this one already has two panes). Use when the user asks to see, show, open or pull up something in tmux, a popup, a split or a window, such as their website, a page, an html file, logs, a dev server or a TUI. "Show me my website" opens it in a popup. For web pages this decides where terminal-browser opens; the terminal-browser skill covers driving the page.
+description: Open things in the user's tmux from this session, as a popup over the conversation or beside it (a split, or a new window when this row already has three panes side by side). Use when the user asks to see, show, open or pull up something in tmux, a popup, a split or a window, such as their website, a page, an html file, logs, a dev server or a TUI. "Show me my website" opens it in a popup. For web pages this decides where terminal-browser opens; the terminal-browser skill covers driving the page.
 ---
 
 This session runs inside the user's tmux. `$TMUX_PANE` is the pane Claude Code
@@ -48,9 +48,10 @@ that goes beside the conversation through:
 ~/.tmux/scripts/open-beside.sh -d -n <name> -c "$PWD" "$TMUX_PANE" -- <command> [args...]
 ```
 
-While this window has only the conversation it opens a 50% split to the right;
-once the window already has two panes it opens a new window (tab) named
-`<name>` instead, so nothing gets squeezed into a narrow third column. When it
+While this pane's row has one or two panes side by side it opens a 50% split
+to the right; once the row already has three (panes stacked above or below
+don't count) it opens a new window (tab) named `<name>` instead, so nothing gets
+squeezed into a narrow fourth column. When it
 opened a window, tell the user it's in the next tab. `-d` leaves the user's
 keyboard on this conversation. It prints the new pane's id; keep it for:
 

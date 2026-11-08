@@ -2,9 +2,9 @@
 """PreToolUse hook (Bash): refuse commands that split Henri's tmux pane directly.
 
 Everything that goes beside the conversation must open through
-~/.tmux/scripts/open-beside.sh, which splits only while the window has one pane
-and opens a new window (tab) once it has two, so nothing ends up a narrow
-third column. Refused here:
+~/.tmux/scripts/open-beside.sh, which splits only while the pane's row has one
+or two panes side by side and opens a new window (tab) once it has three, so
+nothing ends up a narrow fourth column. Refused here:
   - `tmux split-window` / `tmux splitw`
   - `terminal-browser open` outside open-beside.sh or the tmux skill's popup.py
     (with --split, or without a TTY as in Claude's Bash, it splits by itself)
@@ -30,6 +30,6 @@ if reason:
         "permissionDecisionReason":
             f"Blocked {reason}: Henri doesn't want narrow panes. Open it with "
             "~/.tmux/scripts/open-beside.sh -d -n <name> \"$TMUX_PANE\" -- <command> "
-            "(a split while the window has one pane, a new tab once it has two), "
+            "(a split while the row has one or two panes side by side, a new tab once it has three), "
             "or as a popup with ~/.claude/skills/tmux/scripts/popup.py.",
     }}))
