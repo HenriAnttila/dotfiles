@@ -1088,6 +1088,14 @@ def render_panel(rows, cols):
     return "".join(out)
 
 
+def paste(canvas, img, ox, oy):
+    """img into canvas at (ox, oy), the part that falls inside it."""
+    H, W = canvas.shape[:2]; h, w = img.shape[:2]
+    x0, y0, x1, y1 = max(0, ox), max(0, oy), min(W, ox + w), min(H, oy + h)
+    if x1 > x0 and y1 > y0:
+        canvas[y0:y1, x0:x1] = img[y0 - oy:y1 - oy, x0 - ox:x1 - ox]
+
+
 # ─── app ─────────────────────────────────────────────────────────────────────
 class Viewer:
     def __init__(self, model):
@@ -1206,10 +1214,55 @@ class Viewer:
         step = math.radians(10)
         if ev[0] == "key":
             k = ev[1]
+            if self.ref is not None and self.pin_mode and k in ("esc", "x") or (k == "u" and self.pin_pending):
+                # cancel only the half-done pin (its model spot); saved pins are never touched
+                if self.pin_pending:
+                    self.pin_pending, self.click_mark, self.pin_mode = None, None, 1
+                    self.message = "half-done pin cancelled: click a model spot"
+                else:
+                    self.message = "nothing half done (u removes the last saved pin, U brings it back)"
+                self.interact()
+                return True
+            if self.ref is not None and self.pin_mode == 2 and k == "\t" and getattr(self, "pin_pick", None):
+                got = self.frame_xy(*self.pin_pick)
+                if got:
+                    rw, rh, px, py, ov = got
+                    was = [self.renderer.parts[j].hidden for j in self.pin_skip]
+                    for j in self.pin_skip: self.renderer.parts[j].hidden = True
+                    hit = self.renderer.pick(self.cam, rw, rh, px, py, override=ov)
+                    for j, h in zip(self.pin_skip, was): self.renderer.parts[j].hidden = h
+                    if hit is None:  # nothing further back: round to the front again
+                        self.pin_skip = []
+                        hit = self.renderer.pick(self.cam, rw, rh, px, py, override=ov)
+                    if hit:
+                        i, tri, p = hit
+                        self.pin_skip.append(i)
+                        self.pin_pending = {"object": self.renderer.parts[i].name, "point": self.to_blender(p), "unit_m": self.unit_m, "_view": p}
+                        self.click_mark = p
+                        self.message = f"PICKED {self.pin_pending['object']} (Tab: the part behind) - now click where it really is in the frame"
+                self.interact()
+                return True
+            if self.ref is not None and k == "U" and getattr(self, "pins_undone", None):
+                self.shot_pins().append(self.pins_undone.pop())
+                self.save_pins()
+                self.message = f"pin back: {len(self.shot_pins())} pins"
+                self.interact()
+                return True
             if k in ("q", "\x03", "esc"):
                 return False
             if self.message.endswith(" view"):
                 self.message = ""
+            if self.ref is not None and self.pin_mode and k in ("left", "right", "up", "down") and self.shot_pins():
+                pin = self.shot_pins()[-1]   # nudge the last pin's frame point one frame pixel
+                dx, dy = {"left": (-1, 0), "right": (1, 0), "up": (0, -1), "down": (0, 1)}[k]
+                shot = self.ref_shot(); K = shot.K
+                u, v = pin["pixel_straight"][0] + dx, pin["pixel_straight"][1] + dy
+                xn, yn = (u - K["cx"]) / K["f"], (v - K["cy"]) / K["f"]; r2 = xn * xn + yn * yn; d = 1 + K["k1"] * r2 + K["k2"] * r2 * r2
+                pin["pixel_straight"] = [round(u, 1), round(v, 1)]; pin["pixel"] = [round(K["cx"] + K["f"] * xn * d, 1), round(K["cy"] + K["f"] * yn * d, 1)]
+                self.save_pins()
+                self.message = f"pin {len(self.shot_pins())} nudged to {pin['pixel_straight']}"
+                self.interact()
+                return True
             if self.ref is not None:  # footage view: arrows (or h j k l) pause and step; space plays
                 step = {"left": "[", "h": "[", "right": "]", "l": "]", "up": "{", "k": "{", "down": "}", "j": "}"}
                 if k == " ":
@@ -1227,10 +1280,16 @@ class Viewer:
                 self.message = "pin: click a spot on the model" if self.pin_mode else "pins off"
                 self.interact()
                 return True
-            if self.ref is not None and k == "u" and self.shot_pins():  # undo the last pin
+            if self.ref is not None and k == "u" and self.shot_pins():  # remove the last saved pin (U brings it back)
                 gone = self.shot_pins().pop()
+                self.pins_undone = getattr(self, "pins_undone", []) + [gone]
                 self.save_pins()
-                self.message = f"removed the pin on {gone['object']}"
+                self.message = f"removed the pin on {gone['object']} (U brings it back)"
+                self.interact()
+                return True
+            if self.ref is not None and k == "0":  # footage zoom off
+                self.ref_zoom, self.ref_center = 1.0, (0.5, 0.5)
+                self.message = "footage zoom off"
                 self.interact()
                 return True
             if self.ref is not None and k == "s":  # the real shot alone, and back
@@ -1281,13 +1340,17 @@ class Viewer:
             self.interact()
         elif ev[0] == "mouse":
             _, b, x, y, pressed = ev
-            if b in (64, 65):
+            if b in (64, 65) and self.ref is not None:
+                self.ref_zoom_at(x, y, 1.25 if b == 64 else 1 / 1.25)
+            elif b in (64, 65):
                 self.leave_ref()
                 self.cam.zoom(0.9 if b == 64 else 1 / 0.9)
                 self.interact()
             elif pressed and not (b & 32):
                 self.drag = (b & 3, x, y)
                 self.dragged = False
+            elif pressed and (b & 32) and self.drag and self.ref is not None and self.pin_mode:
+                pass  # pinning: a press is always a click, never an orbit (the release places the point)
             elif pressed and (b & 32) and self.drag:
                 btn, px, py = self.drag
                 self.dragged = True
@@ -1377,12 +1440,44 @@ class Viewer:
         self.interact()
         return True
 
+    def ref_offsets(self, W, H, rw, rh):
+        """Where the (possibly zoomed) frame sits in the view: centred, or at ref_center when zoomed in, kept covering the view."""
+        if getattr(self, "ref_zoom", 1.0) <= 1.0:
+            return (W - rw) // 2, (H - rh) // 2
+        cx, cy = getattr(self, "ref_center", (0.5, 0.5))
+        ox, oy = int(W / 2 - cx * rw), int(H / 2 - cy * rh)
+        ox = min(0, max(W - rw, ox)) if rw > W else (W - rw) // 2
+        oy = min(0, max(H - rh, oy)) if rh > H else (H - rh) // 2
+        return ox, oy
+
+    def ref_zoom_at(self, x, y, factor):
+        """Footage view: zoom the frame by factor, keeping the frame point under cell (x, y) under it."""
+        got = self.frame_xy(x, y)
+        cols, img_rows, cw, ch = self.layout
+        W, H = max(16, int(cols * cw)), max(16, int(img_rows * ch))
+        z0 = getattr(self, "ref_zoom", 1.0)
+        zmax = max(1.0, 3000 / max(1, self.ref_view(W, H)[0] / z0))      # the zoomed frame at most ~3000 px wide (memory)
+        z1 = min(zmax, max(1.0, z0 * factor))
+        if got:
+            rw, rh, px, py, _ = got
+            fx, fy = px / rw, py / rh                      # the frame point under the pointer
+            rw0, rh0, ox0, oy0, _ = self.ref_view(W, H)
+            sx, sy = ox0 + px, oy0 + py                    # where it is on screen
+            self.ref_zoom = z1
+            rw1, rh1 = rw0 * z1 / z0, rh0 * z1 / z0
+            self.ref_center = ((W / 2 - (sx - fx * rw1)) / rw1, (H / 2 - (sy - fy * rh1)) / rh1)
+        else:
+            self.ref_zoom = z1
+        self.message = f"footage zoom {self.ref_zoom:.1f}x (0 resets)" if self.ref_zoom > 1 else "footage zoom off"
+        self.interact()
+
     def ref_view(self, W, H):
         """The footage camera letterboxed into W x H: (rw, rh, x offset, y offset, (eye, view, vp))."""
         shot = self.ref_shot()
         sw, sh = shot.size
-        k = min(W / sw, H / sh)
+        k = min(W / sw, H / sh) * getattr(self, "ref_zoom", 1.0)
         rw, rh = max(16, int(sw * k)), max(16, int(sh * k))
+        ox, oy = self.ref_offsets(W, H, rw, rh)
         f, cx, cy = shot.K["f"] * rw / sw, shot.K["cx"] * rw / sw, shot.K["cy"] * rh / sh
         R, t = shot.camera(self.ref[1])
         center, radius = self.xform
@@ -1402,7 +1497,7 @@ class Viewer:
             [0, 0, -1, 0],
         ])
         eye = (np.linalg.inv(view) @ np.array([0, 0, 0, 1.0]))[:3]
-        return rw, rh, (W - rw) // 2, (H - rh) // 2, (eye, view, proj @ view)
+        return rw, rh, ox, oy, (eye, view, proj @ view)
 
     def footage(self, rw, rh):
         fast = getattr(self, "ref_play", False)
@@ -1425,7 +1520,7 @@ class Viewer:
                 lines = self.renderer.outlines(rw, rh, ov).astype(np.float32) / 255
                 a = lines[..., 3:4]
                 frame = frame * (1 - a) + lines[..., :3] * a
-            canvas[oy:oy + rh, ox:ox + rw] = frame
+            paste(canvas, frame, ox, oy)
             return (np.clip(canvas, 0, 1) * 255).astype(np.uint8)
         layer = self.renderer.render(self.cam, draw_mode, rw, rh, self.wire, False, True, self.markers(),
                                      override=ov, layer="wire" if self.ref_style == "wire" else "shaded")
@@ -1439,7 +1534,7 @@ class Viewer:
                 a = a * 0.55
         canvas = np.empty((H, W, 3), dtype=np.float32)
         canvas[:] = BG_BOTTOM
-        canvas[oy:oy + rh, ox:ox + rw] = under * (1 - a) + rgb * a
+        paste(canvas, under * (1 - a) + rgb * a, ox, oy)
         return (np.clip(canvas, 0, 1) * 255).astype(np.uint8)
 
     # ─── focus: look at chosen parts only ───────────────────────────────────
@@ -1602,10 +1697,11 @@ class Viewer:
                 self.message = "no model there: click a spot on the model"
             else:
                 i, tri, p = hit
+                self.pin_pick, self.pin_skip = (x, y), [i]
                 self.pin_pending = {"object": self.renderer.parts[i].name, "point": self.to_blender(p), "unit_m": self.unit_m, "_view": p}
                 self.click_mark = p
                 self.pin_mode = 2
-                self.message = f"{self.pin_pending['object']}: now click where that spot really is in the frame"
+                self.message = f"PICKED {self.pin_pending['object']} (Tab: the part behind) - now click where it really is in the frame"
         else:  # where it is in the frame: a pixel of the straightened frame, and of the original
             sw, sh = shot.size
             K = shot.K
@@ -1724,6 +1820,11 @@ class Viewer:
             return {"click": self.click}
         if cmd == "ref":
             return self.ref_command(pos, kw)
+        if cmd == "zoom":  # footage zoom at a cell, as the mouse wheel does: zoom <col> <row> <factor>
+            if self.ref is None:
+                return {"error": "not in footage view"}
+            self.ref_zoom_at(int(pos[0]), int(pos[1]), float(pos[2]))
+            return {"ok": True, "zoom": self.ref_zoom, "center": list(getattr(self, "ref_center", (0.5, 0.5)))}
         if cmd == "pins":  # the current shot's pins; pins clear / pins undo
             if self.ref is None:
                 return {"error": "not in footage view: ref <shot> <frame> first"}
@@ -1984,7 +2085,7 @@ class Viewer:
         if self.message:
             tail.append((self.message, GOLD))
         if self.ref is not None:
-            keys = (["click model, then frame  u undo  p done  ← → frame", "click model, then frame  u undo  p done"] if self.pin_mode else
+            keys = (["model, then frame  x cancel  u remove last  U bring back  arrows nudge  [ ] frame  p done", "model, frame  x cancel  u/U  arrows  [ ]  p"] if self.pin_mode else
                     ["p pins  s real shot  o overlay  space play  ← → frame  ↑ ↓ shot  r back  q quit",
                      "p pins  s real  o look  ␣ play  ←→ frame  ↑↓ shot  r back  q"])
         elif self.refs:
@@ -2191,11 +2292,30 @@ def ctl(args):
     return 1 if "error" in reply else 0
 
 
+def only_glb(path):
+    """meshview shows exported models, never a .blend (Henri): a .blend means the .glb beside it, if there is one."""
+    p = Path(path)
+    if p.suffix.lower() != ".blend":
+        return str(path)
+    glb = p.with_suffix(".glb")
+    if glb.exists():
+        print(f"meshview: showing {glb.name}, not the .blend", file=sys.stderr)
+        return str(glb)
+    print(f"meshview opens .glb files, not .blend: export {p.name} to .glb first", file=sys.stderr)
+    sys.exit(1)
+
+
 def main():
     args = sys.argv[1:]
     if not args or args[0] in ("-h", "--help"):
         print(__doc__.strip())
         return 0
+    if args[0] in ("--split", "--stats") and len(args) > 1:
+        args[1] = only_glb(args[1])
+    elif args[0] == "--snapshot" and len(args) > 2:
+        args[-1] = only_glb(args[-1])
+    elif args[0] not in ("ctl",):
+        args[0] = only_glb(args[0])
     if args[0] == "--split":
         model = Path(args[1]).resolve()
         if not os.environ.get("TMUX"):
